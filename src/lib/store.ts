@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { catalog, getLab, gradeQuestion, type Question } from "@/data/campaign";
+import { catalog, gradeQuestion, type Question } from "@/data/campaign";
+import { getLab } from "@/lib/labs";
 
 export type ExtraQ = { prompt: string; answer: string; points: number };
 
