@@ -1,7 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Radio, ShieldAlert } from "lucide-react";
-import { LAB_BANNER, catalog, getLab } from "@/data/campaign";
+import { Radio, ShieldAlert, Wrench } from "lucide-react";
+import { LAB_BANNER } from "@/data/campaign";
+import { getLab, useAllLabs } from "@/lib/labs";
 import { useLab, type ExtraQ } from "@/lib/store";
 import { cn } from "@/lib/cn";
 
@@ -21,6 +22,7 @@ function Dashboard() {
   const live = useLab((s) => s.live);
   const sessionCode = useLab((s) => s.sessionCode);
   const goLive = useLab((s) => s.goLive);
+  const labs = useAllLabs();
   const pack = getLab(labId);
   const [copied, setCopied] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -53,9 +55,18 @@ function Dashboard() {
         </header>
 
         <section>
-          <h2 className="mb-3 text-sm font-medium">Labs</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium">Labs</h2>
+            <Link
+              to="/builder"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted hover:text-fg"
+            >
+              <Wrench className="size-3.5" />
+              Lab builder
+            </Link>
+          </div>
           <ul className="grid gap-3 sm:grid-cols-2">
-            {catalog.map((l) => (
+            {labs.map((l) => (
               <li key={l.id}>
                 <button
                   type="button"
@@ -65,7 +76,14 @@ function Dashboard() {
                     labId === l.id ? "border-primary bg-surface" : "border-border bg-surface",
                   )}
                 >
-                  <span className="font-mono text-[10px] text-primary">{l.code}</span>
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] text-primary">{l.code}</span>
+                    {l.custom && (
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] text-primary uppercase">
+                        Custom
+                      </span>
+                    )}
+                  </span>
                   <span className="font-medium">{l.name}</span>
                   <span className="text-sm text-muted">{l.blurb}</span>
                   <span className="font-mono text-xs text-muted">{l.minutes} min · {l.questions.length} Q</span>
@@ -73,6 +91,15 @@ function Dashboard() {
               </li>
             ))}
           </ul>
+          {labs.length === 0 && (
+            <p className="text-sm text-muted">
+              No labs yet.{" "}
+              <Link to="/builder" className="text-primary underline">
+                Build one
+              </Link>
+              .
+            </p>
+          )}
         </section>
 
         <section className="grid gap-4 rounded-xl border border-border bg-surface p-5 sm:grid-cols-2">
