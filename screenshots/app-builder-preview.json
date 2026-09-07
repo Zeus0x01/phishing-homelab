@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "PhishLab CTF",
+      "hasCanvas": false,
+      "bodyTextLen": 612,
+      "bodyTextHash": "b9aea10cee61180c4c428191834393f06ee74d2cd2e2e4508c765ad9cef7ad26",
+      "bodyTextPrefix": "CLOSED TRAINING LAB — fictional artifacts, no mail is sent, no c",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "PhishLab CTF",
+      "hasCanvas": false,
+      "bodyTextLen": 612,
+      "bodyTextHash": "b9aea10cee61180c4c428191834393f06ee74d2cd2e2e4508c765ad9cef7ad26",
+      "bodyTextPrefix": "CLOSED TRAINING LAB — fictional artifacts, no mail is sent, no c",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
