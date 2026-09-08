@@ -11,69 +11,13 @@
     "Flag disposable or unusual TLDs in unsolicited messages",
     "Compare displayed link text to the real hostname"
   ],
-  "steps": [
-    {
-      "id": "u1",
-      "title": "Lookalike brand domain",
-      "prompt": "Which hostname is a lookalike of paypal.com (digit or character substitution)?",
-      "hint": "Compare letter by letter with paypal.com — watch for 1 vs l.",
-      "checkType": "flag",
-      "expected": ["paypa1-secure.com", "www.paypa1-secure.com"],
-      "points": 20
-    },
-    {
-      "id": "u2",
-      "title": "Punycode decoding",
-      "prompt": "What punycode (xn--) hostname is stored for the internationalized lookalike URL?",
-      "hint": "Engine → artifacts → URL entries list punycode even when the UI shows Unicode.",
-      "checkType": "flag",
-      "expected": ["xn--pypal-4ve.com", "www.xn--pypal-4ve.com"],
-      "points": 20
-    },
-    {
-      "id": "u3",
-      "title": "Risky TLD",
-      "prompt": "Which TLD on the invoice lure is commonly treated as higher risk in this training set?",
-      "hint": "Compare the options to the hostname on the lure link.",
-      "checkType": "choice",
-      "choices": ["com", "xyz", "example"],
-      "expected": ["xyz"],
-      "points": 15
-    },
-    {
-      "id": "u4",
-      "title": "What to do next",
-      "prompt": "You found a lookalike domain and a risky TLD. What is the best next action in this training scenario?",
-      "checkType": "choice",
-      "choices": [
-        "Click through to verify the page looks real",
-        "Report / quarantine and do not use the link",
-        "Reply to the sender asking if it is legitimate"
-      ],
-      "expected": ["Report / quarantine and do not use the link"],
-      "points": 15
-    }
-  ],
+  "steps": [],
   "hints": [
     "A Latin 'l' and digit '1' are easy to miss at small font sizes.",
-    "Punycode is a representation of Unicode domains — decode it before trusting the brand.",
-    "Never verify a suspicious link by opening it on a production machine; use the training Engine panel instead."
+    "Punycode is a representation of Unicode domains — decode it before trusting the brand."
   ],
-  "scoringRubric": [
-    {"id": "r1", "description": "PayPal lookalike named", "points": 20},
-    {"id": "r2", "description": "Punycode identified", "points": 20},
-    {"id": "r3", "description": "Risky TLD named", "points": 15},
-    {"id": "r4", "description": "Correct response action", "points": 15}
-  ],
-  "flags": [
-    {
-      "id": "lookalike-host",
-      "label": "Lookalike host",
-      "check": "contains",
-      "value": "paypa1-secure.com",
-      "points": 20
-    }
-  ],
+  "scoringRubric": [],
+  "flags": [],
   "renderer": "url-typospot",
   "published": true,
   "emailSamples": [
@@ -89,8 +33,8 @@
       "preview": "Invoice 88421 is 3 days overdue…",
       "html": "<p>Your PayPal Business account has a past-due invoice.</p><p><a href=\"https://www.paypa1-secure.com/invoice/88421\">View invoice</a></p><p><a href=\"https://www.xn--pypal-4ve.com/pay\">Unicode lookalike pay link</a></p><p><a href=\"https://pay-now.campaign-relay.xyz/r/pp\">Secure checkout</a></p>",
       "rawSource": "From: service@paypa1-secure.com\nSubject: Invoice 88421 overdue\n\nTRAINING SAMPLE",
-      "headers": "From: \"PayPal Billing\" <service@paypa1-secure.com>\nReply-To: billing@paypa1-secure.com\nTo: ap@northwind-lab.example\nSubject: Invoice 88421 overdue — pay to avoid restriction\nAuthentication-Results: spf=fail; dkim=none; dmarc=fail",
-      "auth": {"spf": "fail", "dkim": "none", "dmarc": "fail"},
+      "headers": "From: \"PayPal Billing\" <service@paypa1-secure.com>\nReply-To: billing@paypa1-secure.com\nAuthentication-Results: spf=fail; dkim=none; dmarc=fail",
+      "auth": { "spf": "fail", "dkim": "none", "dmarc": "fail" },
       "urls": [
         {
           "display": "View invoice",
@@ -125,7 +69,7 @@
       ],
       "attachments": [],
       "images": [],
-      "language": {"locale": "en", "tone": ["finance", "urgent"], "urgencyScore": 72},
+      "language": { "locale": "en", "tone": ["finance", "urgent"], "urgencyScore": 72 },
       "sendingIps": ["198.51.100.44"],
       "fakeLoginIndicators": ["brand lookalike", "payment urgency"],
       "credentialHarvest": false
