@@ -58,39 +58,27 @@ export function isLookalikeHost(host: string, brand: string) {
   if (sld === brand) return false;
   if (sld.includes(brand) && sld !== brand) return true;
   if (h.includes(`${brand}-`) || h.includes(`-${brand}`)) return true;
-  const digitSwap = sld.replace(/1/g, "l").replace(/0/g, "o");
-  if (digitSwap === brand) return true;
-  return levenshtein(sld, brand) === 1 && Math.abs(sld.length - brand.length) <= 1;
+  if (Math.abs(sld.length - brand.length) <= 2 && levenshtein(sld, brand) <= 2) return true;
+  return false;
 }
 
-function wildcardMatch(value: string, pattern: string) {
-  const re = new RegExp(
-    "^" +
-      pattern
-        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-        .replace(/\*/g, ".*")
-        .replace(/\?/g, ".") +
-      "$",
-    "i",
-  );
-  return re.test(value);
+function wildcardMatch(text: string, pattern: string) {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+  return new RegExp(`^${escaped}$`, "i").test(text);
 }
 
 function fieldValues(sample: ExtractedSample, field: string): { artifact: Artifact; text: string }[] {
   const arts = sample.artifacts;
   switch (field) {
-    case "sender.address":
-      return arts.filter((a) => a.kind === "sender").map((a) => ({ artifact: a, text: a.value }));
-    case "sender.domain":
-      return arts.filter((a) => a.kind === "domain").map((a) => ({ artifact: a, text: a.value }));
-    case "replyTo":
-      return arts.filter((a) => a.kind === "reply-to").map((a) => ({ artifact: a, text: a.value }));
     case "url.tld":
       return arts.filter((a) => a.kind === "url").map((a) => ({ artifact: a, text: String(a.meta.tld ?? "") }));
+    case "url.host":
     case "url.hostname":
       return arts.filter((a) => a.kind === "url").map((a) => ({ artifact: a, text: String(a.meta.hostname ?? "") }));
-    case "url.href":
-      return arts.filter((a) => a.kind === "url").map((a) => ({ artifact: a, text: a.value }));
+    case "sender.domain":
+      return arts.filter((a) => a.kind === "domain").map((a) => ({ artifact: a, text: a.value }));
+    case "sender.addr":
+      return arts.filter((a) => a.kind === "sender").map((a) => ({ artifact: a, text: a.value }));
     case "attachment.ext":
       return arts.filter((a) => a.kind === "attachment").map((a) => ({ artifact: a, text: String(a.meta.ext ?? "") }));
     case "attachment.sha256":
@@ -106,6 +94,10 @@ function fieldValues(sample: ExtractedSample, field: string): { artifact: Artifa
     default:
       return arts.map((a) => ({ artifact: a, text: a.value }));
   }
+}
+
+function aKindsHost(a: Artifact) {
+  return a.kind === "url" || a.kind === "domain";
 }
 
 function evalCondition(
@@ -138,12 +130,31 @@ function evalCondition(
   if (cond.field === "credentialHarvest") {
     const art = sample.artifacts.find((a) => a.kind === "language");
     const ok = Boolean(art?.meta.credentialHarvest);
-    return ok && art ? [{ ok: true, artifactId: art.id, evidence: "template marks credential-harvest" }] : [];
+    return ok && art
+      ? [
+          {
+            ok: true,
+            artifactId: art.id,
+            evidence: `credential-harvest flag on sample · tone: ${art.value || "n/a"} · urgency ${art.meta.urgencyScore ?? "?"}`,
+          },
+        ]
+      : [];
   }
   if (cond.field === "fakeLogin") {
     const art = sample.artifacts.find((a) => a.kind === "language");
     const ok = Boolean(art?.meta.credentialHarvest);
-    return ok && art ? [{ ok: true, artifactId: art.id, evidence: "fake login indicators on sample" }] : [];
+    if (!ok || !art) return [];
+    const indicators = String(art.meta.fakeLoginIndicators ?? "none");
+    return [
+      {
+        ok: true,
+        artifactId: art.id,
+        evidence:
+          indicators && indicators !== "none"
+            ? `fake login signals: ${indicators}`
+            : "credential-harvest sample without explicit indicator list",
+      },
+    ];
   }
   if (cond.field === "ioc") {
     const hits: { ok: boolean; artifactId: string; evidence: string }[] = [];
@@ -174,13 +185,16 @@ function evalCondition(
     if (cond.op === "wildcard") ok = wildcardMatch(v, cond.value);
     if (cond.op === "exists") ok = v.length > 0;
     if (cond.op === "gt") ok = Number(v) > Number(cond.value);
-    if (ok) hits.push({ ok: true, artifactId: row.artifact.id, evidence: `${cond.field} ${cond.op} ${cond.value} → ${v}` });
+    if (ok) {
+      const label = row.artifact.kind === "attachment" ? ` (${row.artifact.label})` : "";
+      hits.push({
+        ok: true,
+        artifactId: row.artifact.id,
+        evidence: `${cond.field} ${cond.op} ${cond.value} → ${v}${label}`,
+      });
+    }
   }
   return hits;
-}
-
-function aKindsHost(a: Artifact) {
-  return a.kind === "url" || a.kind === "domain";
 }
 
 export function evaluateRule(
@@ -200,10 +214,8 @@ export function evaluateRule(
       return null;
     }
   }
-  if (rule.logic === "and") {
-    return matched.length >= rule.conditions.length ? { rule, matched } : null;
-  }
-  return matched.length ? { rule, matched } : null;
+  if (!matched.length) return null;
+  return { rule, matched };
 }
 
 export function evaluateRules(
@@ -278,5 +290,13 @@ export const builtinRules: DetectionRule[] = [
     logic: "or",
     pack: "builtin",
     conditions: [{ id: "c1", field: "ioc", op: "exists", value: "" }],
+  },
+  {
+    id: "pack-auth-fail",
+    name: "Authentication failure (SPF)",
+    enabled: true,
+    logic: "and",
+    pack: "builtin",
+    conditions: [{ id: "c1", field: "auth.spf", op: "eq", value: "fail" }],
   },
 ];
