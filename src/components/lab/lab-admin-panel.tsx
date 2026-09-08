@@ -16,6 +16,11 @@ type StepLike = {
   hint?: string;
 };
 
+function isInstructorStep(step: StepLike): boolean {
+  const id = String(step?.id ?? "");
+  return id.startsWith("instructor-") || id.startsWith("extra-");
+}
+
 function instructorStepsFromExtra(extra: ExtraQ[]): StepLike[] {
   return extra
     .filter((row) => row.prompt.trim().length > 0)
@@ -34,8 +39,7 @@ function extraFromInstructorSteps(steps: unknown): ExtraQ[] {
   return steps
     .filter((step): step is StepLike => {
       if (!step || typeof step !== "object") return false;
-      const id = String((step as StepLike).id ?? "");
-      return id.startsWith("instructor-");
+      return isInstructorStep(step as StepLike);
     })
     .map((step) => ({
       prompt: String(step.prompt ?? ""),
@@ -92,17 +96,9 @@ export function LabAdminPanel() {
           category: "email",
           minutes: 20,
           learningObjectives: ["Identify a training artifact"],
-          steps: [
-            {
-              id: "step-1",
-              title: "Review the artifact",
-              prompt: "What should the trainee notice?",
-              checkType: "manual",
-              points: 10,
-            },
-          ],
+          steps: [],
           hints: ["Use only fictional template data."],
-          scoringRubric: [{ id: "rubric-1", description: "Completes the review", points: 10 }],
+          scoringRubric: [],
           flags: [],
           renderer: "generic",
           emailSamples: [],
@@ -130,13 +126,16 @@ export function LabAdminPanel() {
     try {
       const payload = JSON.parse(draft) as Record<string, unknown>;
       const existingSteps = Array.isArray(payload.steps) ? (payload.steps as StepLike[]) : [];
-      const baseSteps = existingSteps.filter((step) => !String(step?.id ?? "").startsWith("instructor-"));
+      // Drop any previous instructor/extra steps so re-save never doubles them.
+      const baseSteps = existingSteps.filter((step) => !isInstructorStep(step));
       const instructorSteps = instructorStepsFromExtra(extra);
       payload.steps = [...baseSteps, ...instructorSteps];
 
-      // Keep rubric in sync for instructor items (best-effort).
       const rubric = Array.isArray(payload.scoringRubric) ? [...(payload.scoringRubric as Record<string, unknown>[])] : [];
-      const baseRubric = rubric.filter((item) => !String(item?.id ?? "").startsWith("instructor-"));
+      const baseRubric = rubric.filter((item) => {
+        const id = String(item?.id ?? "");
+        return !id.startsWith("instructor-") && !id.startsWith("extra-");
+      });
       payload.scoringRubric = [
         ...baseRubric,
         ...instructorSteps.map((step) => ({
@@ -157,6 +156,14 @@ export function LabAdminPanel() {
       const savedJson = JSON.stringify(payload, null, 2);
       setDraft(savedJson);
       setSelected(String(payload.id ?? selected));
+      // Keep session extra in exact sync with what was written (no accumulation).
+      setExtra(
+        instructorSteps.map((step) => ({
+          prompt: String(step.prompt ?? ""),
+          answer: Array.isArray(step.expected) && step.expected[0] ? String(step.expected[0]) : "",
+          points: typeof step.points === "number" ? step.points : 10,
+        })),
+      );
       await refresh();
       setMessage(
         instructorSteps.length
@@ -191,9 +198,9 @@ export function LabAdminPanel() {
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="mb-1 font-medium">Lab registry editor</h2>
         <p className="mb-4 text-xs text-muted">
-          Edit the JSON definition. Instructor questions from <strong className="text-fg">Your questions</strong> are written
-          into <code className="font-mono">steps</code> when you click <strong className="text-fg">Save definition</strong>.
-          File-backed labs stay read-only; save creates/updates a database copy.
+          Edit the JSON definition. Instructor questions from <strong className="text-fg">Your questions</strong> replace any
+          existing <code className="font-mono">instructor-*</code> steps on each save (no duplicates). File-backed labs stay
+          read-only; save creates/updates a database copy.
         </p>
 
         <div className="grid gap-4 lg:grid-cols-[220px_1fr]">

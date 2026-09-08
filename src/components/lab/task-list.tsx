@@ -2,6 +2,10 @@ import type { LabDefinition } from "@/lib/labs/schema";
 import { useSession, type ExtraQ } from "@/lib/store";
 import { cn } from "@/lib/cn";
 
+function isInstructorStepId(id: string) {
+  return id.startsWith("instructor-") || id.startsWith("extra-");
+}
+
 export function TaskList({
   lab,
   answers,
@@ -17,10 +21,19 @@ export function TaskList({
   const submitted = useSession((s) => s.submitted);
   const usableExtra = extra.filter((row) => row.prompt.trim().length > 0);
 
+  // After Save definition, instructor questions live in lab.steps — do not also render session extra.
+  const hasSavedInstructorSteps = lab.steps.some((step) => isInstructorStepId(step.id));
+  const showSessionExtra = usableExtra.length > 0 && !hasSavedInstructorSteps;
+
+  const promptsInSteps = new Set(lab.steps.map((step) => step.prompt.trim().toLowerCase()).filter(Boolean));
+  const sessionOnlyExtra = showSessionExtra
+    ? usableExtra.filter((row) => !promptsInSteps.has(row.prompt.trim().toLowerCase()))
+    : [];
+
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-medium">Tasks</h2>
-      {lab.steps.length === 0 && usableExtra.length === 0 ? (
+      {lab.steps.length === 0 && sessionOnlyExtra.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
           No tasks on this lab yet. Add questions in Admin → Your questions, then Save definition.
         </p>
@@ -67,11 +80,11 @@ export function TaskList({
         </fieldset>
       ))}
 
-      {usableExtra.length > 0 ? (
+      {sessionOnlyExtra.length > 0 ? (
         <>
-          <h2 className="pt-2 text-sm font-medium">Instructor questions</h2>
-          <p className="text-xs text-muted">Added from Admin · stored in this browser session only until Save definition.</p>
-          {usableExtra.map((row, index) => {
+          <h2 className="pt-2 text-sm font-medium">Instructor questions (unsaved)</h2>
+          <p className="text-xs text-muted">Session only until you click Save definition in Admin.</p>
+          {sessionOnlyExtra.map((row, index) => {
             const id = `extra-${index}`;
             return (
               <fieldset key={id} className="rounded-xl border border-primary/30 bg-surface p-4">
