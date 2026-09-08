@@ -139,6 +139,8 @@ export function extractArtifacts(lab: LabDefinition, sample: EmailSample): Extra
       locale: sample.language.locale,
       urgencyScore: sample.language.urgencyScore,
       credentialHarvest: sample.credentialHarvest,
+      fakeLoginIndicators: sample.fakeLoginIndicators.join("; ") || "none",
+      indicatorCount: sample.fakeLoginIndicators.length,
     },
   });
 
