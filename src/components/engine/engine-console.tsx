@@ -199,6 +199,8 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
     return <p className="p-6 text-sm text-muted">No validated email samples are available.</p>;
   }
 
+  const fromLine = `${sample.fromName} <${sample.fromAddr}> · Reply-To: ${sample.replyTo}`;
+
   return (
     <div className="mx-auto grid max-w-[1500px] gap-4 p-4 sm:p-6">
       <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-warn">
@@ -244,9 +246,7 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
                   {selectedLab?.category} · {selectedLab?.difficulty} · {sample.folder}
                 </p>
                 <h2 className="mt-1 text-lg font-semibold">{sample.subject}</h2>
-                <p className="text-xs text-muted">
-                  {sample.fromName} &lt;{sample.fromAddr}&gt; · Reply-To: {sample.replyTo}
-                </p>
+                <p className="text-xs text-muted">{fromLine}</p>
               </div>
               <div className="flex items-center gap-2 text-xs">
                 <span
@@ -435,7 +435,7 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-surface p-4">
-                <h3 className="mb-3 text-sm font-medium">Case activity</h3>
+                <h3 className="text-sm font-medium mb-3">Case activity</h3>
                 {audit.length ? (
                   <ul className="space-y-2 text-xs">
                     {audit.map((entry, index) => (
