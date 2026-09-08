@@ -20,6 +20,11 @@ export function TaskList({
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-medium">Tasks</h2>
+      {lab.steps.length === 0 && usableExtra.length === 0 ? (
+        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
+          No tasks on this lab yet. Add questions in Admin → Your questions, then Save definition.
+        </p>
+      ) : null}
       {lab.steps.map((step, i) => (
         <fieldset key={step.id} className="rounded-xl border border-border bg-surface p-4">
           <legend className="px-1 text-sm font-medium">
@@ -65,7 +70,7 @@ export function TaskList({
       {usableExtra.length > 0 ? (
         <>
           <h2 className="pt-2 text-sm font-medium">Instructor questions</h2>
-          <p className="text-xs text-muted">Added from Admin · stored in this browser session only.</p>
+          <p className="text-xs text-muted">Added from Admin · stored in this browser session only until Save definition.</p>
           {usableExtra.map((row, index) => {
             const id = `extra-${index}`;
             return (
