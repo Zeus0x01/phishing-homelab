@@ -1,0 +1,138 @@
+{
+  "id": "email-analysis",
+  "title": "Inbox triage: spoofed payroll mail",
+  "description": "Read a reported message the way an analyst would: headers, authentication results, reply-to, and the real destinations behind the links. Everything here is a fictional Northwind Lab sample.",
+  "difficulty": "intro",
+  "category": "email",
+  "minutes": 20,
+  "learningObjectives": [
+    "Separate display name from the envelope From address",
+    "Read SPF, DKIM, and DMARC results in Authentication-Results",
+    "Hover-check every URL before treating it as the claimed brand",
+    "Explain why a reply-to mismatch is an investigation lead"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Identify the sending domain",
+      "prompt": "What domain is in the From address of the payroll message?",
+      "hint": "Look at From, not the display name.",
+      "checkType": "flag",
+      "expected": ["northwind-payrol1.com", "from:northwind-payrol1.com"],
+      "points": 15
+    },
+    {
+      "id": "s2",
+      "title": "Authentication",
+      "prompt": "Did SPF pass, fail, or none on the payroll message?",
+      "checkType": "choice",
+      "choices": ["pass", "fail", "none"],
+      "expected": ["fail"],
+      "points": 15
+    },
+    {
+      "id": "s3",
+      "title": "Link destination",
+      "prompt": "What hostname does the 'Open payroll portal' link actually resolve to in the template?",
+      "hint": "Rendered view hover, or the URLs list in Engine.",
+      "checkType": "flag",
+      "expected": ["secure-verify.live", "login.secure-verify.live"],
+      "points": 20
+    },
+    {
+      "id": "s4",
+      "title": "Reply-To",
+      "prompt": "Is Reply-To the same as From? Answer yes or no.",
+      "checkType": "choice",
+      "choices": ["yes", "no"],
+      "expected": ["no"],
+      "points": 10
+    }
+  ],
+  "hints": [
+    "Display names are free text. The address after @ is the claim you can test.",
+    "A fail on SPF plus a lookalike domain is stronger than urgency language alone.",
+    "Open the Engine tab on this sample to see extracted artifacts."
+  ],
+  "scoringRubric": [
+    { "id": "r1", "description": "Correct sending domain", "points": 15 },
+    { "id": "r2", "description": "Correct SPF reading", "points": 15 },
+    { "id": "r3", "description": "Correct link hostname", "points": 20 },
+    { "id": "r4", "description": "Reply-To mismatch spotted", "points": 10 }
+  ],
+  "flags": [
+    { "id": "sending-domain", "label": "From domain", "check": "contains", "value": "northwind-payrol1.com", "points": 15 }
+  ],
+  "renderer": "email-analysis",
+  "published": true,
+  "emailSamples": [
+    {
+      "id": "nw-payroll-01",
+      "folder": "Reported",
+      "fromName": "Northwind Payroll",
+      "fromAddr": "noreply@northwind-payrol1.com",
+      "replyTo": "helpdesk@northwind-payroll-support.xyz",
+      "to": "finance@northwind-lab.example",
+      "subject": "Action required: payroll file rejected — confirm within 2 hours",
+      "date": "Tue, 08 Sep 2026 08:12:04 +0000",
+      "preview": "Your direct-deposit file was rejected. Confirm banking details immediately…",
+      "html": "<p>Team,</p><p>The overnight <b>payroll submission</b> for Northwind Lab was rejected by the bank gateway.</p><p class=\"urg\">You must confirm account details within 2 hours or Friday pay will be delayed.</p><p><a href=\"https://login.secure-verify.live/payroll?ref=nw\">Open payroll portal</a></p><p>Regards,<br/>Payroll Operations<br/>Northwind Lab</p><img alt=\"spacer\" src=\"cid:pixel-001\" />",
+      "rawSource": "Return-Path: <bounce@mailer.campaign-relay.top>\nReceived: from outbound.campaign-relay.top (185.199.108.153)\nFrom: \"Northwind Payroll\" <noreply@northwind-payrol1.com>\nReply-To: helpdesk@northwind-payroll-support.xyz\nTo: finance@northwind-lab.example\nSubject: Action required: payroll file rejected — confirm within 2 hours\nDate: Tue, 08 Sep 2026 08:12:04 +0000\nMessage-ID: <nw-payroll-01@northwind-payrol1.com>\nMIME-Version: 1.0\nContent-Type: text/html; charset=UTF-8\n\n<html><body>TRAINING SAMPLE BODY</body></html>",
+      "headers": "Return-Path: <bounce@mailer.campaign-relay.top>\nReceived: from outbound.campaign-relay.top ([185.199.108.153]) by mx.northwind-lab.example; Tue, 08 Sep 2026 08:12:09 +0000\nFrom: \"Northwind Payroll\" <noreply@northwind-payrol1.com>\nReply-To: helpdesk@northwind-payroll-support.xyz\nTo: finance@northwind-lab.example\nSubject: Action required: payroll file rejected — confirm within 2 hours\nDate: Tue, 08 Sep 2026 08:12:04 +0000\nMessage-ID: <nw-payroll-01@northwind-payrol1.com>\nAuthentication-Results: mx.northwind-lab.example; spf=fail smtp.mailfrom=northwind-payrol1.com; dkim=none; dmarc=fail",
+      "auth": { "spf": "fail", "dkim": "none", "dmarc": "fail" },
+      "urls": [
+        {
+          "display": "Open payroll portal",
+          "href": "https://login.secure-verify.live/payroll?ref=nw",
+          "hostname": "login.secure-verify.live",
+          "punycode": "login.secure-verify.live",
+          "tld": "live",
+          "suspiciousTld": false,
+          "redirectChain": [
+            "https://login.secure-verify.live/payroll?ref=nw",
+            "https://cdn.campaign-relay.top/r/1",
+            "https://secure-verify.live/login.php"
+          ]
+        }
+      ],
+      "attachments": [],
+      "images": [{ "alt": "spacer", "src": "cid:pixel-001" }],
+      "language": { "locale": "en", "tone": ["urgent", "payroll", "authority"], "urgencyScore": 86 },
+      "sendingIps": ["185.199.108.153"],
+      "fakeLoginIndicators": ["brand impersonation", "credential form on unrelated TLD"],
+      "credentialHarvest": true
+    },
+    {
+      "id": "nw-benign-01",
+      "folder": "Finance",
+      "fromName": "Northwind Payroll",
+      "fromAddr": "payroll@northwind-lab.example",
+      "replyTo": "payroll@northwind-lab.example",
+      "to": "finance@northwind-lab.example",
+      "subject": "Pay calendar published for September",
+      "date": "Mon, 07 Sep 2026 16:02:11 +0000",
+      "preview": "The September pay calendar is on the intranet…",
+      "html": "<p>Hello,</p><p>The September pay calendar is on the intranet. No action needed if your details are current.</p><p><a href=\"https://intranet.northwind-lab.example/payroll\">intranet.northwind-lab.example/payroll</a></p>",
+      "rawSource": "From: payroll@northwind-lab.example\nReply-To: payroll@northwind-lab.example\nSubject: Pay calendar published for September\nAuthentication-Results: spf=pass; dkim=pass; dmarc=pass\n\nBenign training sample.",
+      "headers": "From: \"Northwind Payroll\" <payroll@northwind-lab.example>\nReply-To: payroll@northwind-lab.example\nTo: finance@northwind-lab.example\nSubject: Pay calendar published for September\nDate: Mon, 07 Sep 2026 16:02:11 +0000\nAuthentication-Results: mx.northwind-lab.example; spf=pass smtp.mailfrom=northwind-lab.example; dkim=pass header.d=northwind-lab.example; dmarc=pass",
+      "auth": { "spf": "pass", "dkim": "pass", "dmarc": "pass" },
+      "urls": [
+        {
+          "display": "intranet.northwind-lab.example/payroll",
+          "href": "https://intranet.northwind-lab.example/payroll",
+          "hostname": "intranet.northwind-lab.example",
+          "punycode": "intranet.northwind-lab.example",
+          "tld": "example",
+          "suspiciousTld": false,
+          "redirectChain": ["https://intranet.northwind-lab.example/payroll"]
+        }
+      ],
+      "attachments": [],
+      "images": [],
+      "language": { "locale": "en", "tone": ["informational"], "urgencyScore": 12 },
+      "sendingIps": ["203.0.113.10"],
+      "fakeLoginIndicators": [],
+      "credentialHarvest": false
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-bg: #0a0d12;
+  --color-surface: #111720;
+  --color-raised: #19212c;
+  --color-overlay: #222c39;
+  --color-fg: #edf2f5;
+  --color-muted: #91a0ae;
+  --color-primary: #52dfc5;
+  --color-primary-dim: #249d8c;
+  --color-warn: #f2c14e;
+  --color-crit: #ff7182;
+  --color-border: #2a3847;
+  --color-pass: #54d994;
+  --color-info: #70a7ff;
+  --radius-panel: 0.8rem;
+  --radius-control: 0.45rem;
+  --spacing-page: 1.25rem;
+  --spacing-sidebar: 16rem;
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+body {
+  background-color: var(--color-bg);
+  background-image: linear-gradient(120deg, rgb(82 223 197 / 0.035), transparent 38%),
+    linear-gradient(320deg, rgb(112 167 255 / 0.035), transparent 42%);
+}
+
+::selection {
+  color: var(--color-bg);
+  background: var(--color-primary);
+}
+
+.scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgb(0 0 0 / 0.08) 3px
+  );
+}

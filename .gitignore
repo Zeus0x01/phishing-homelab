@@ -1,0 +1,10 @@
+node_modules/
+.vercel/
+screenshots/*
+!screenshots/.gitkeep
+artifacts/*
+!artifacts/.gitkeep
+.project_id
+.github_repo
+.env
+.env.*
