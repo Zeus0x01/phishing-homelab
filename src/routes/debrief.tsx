@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { computeScore, useLab } from "@/lib/store";
+import { useLab } from "@/lib/store";
 import { computeLabScore } from "@/lib/engine/scoring";
-import { getLab, totalFor } from "@/data/campaign";
+import { getLab, gradeQuestion } from "@/data/campaign";
 import { loadFileLabs } from "@/lib/labs/loader";
 import { listLabs } from "@/lib/labs/service";
 import type { LabDefinition } from "@/lib/labs/schema";
@@ -10,7 +10,6 @@ import { recordProgressAttempt } from "@/lib/services/progress";
 
 export const Route = createFileRoute("/debrief")({ component: Debrief });
 
-/** Map campaign pack ids to JSON training lab ids when they differ. */
 function templateIdFor(labId: string): string {
   if (labId === "nightwire") return "email-analysis";
   return labId;
@@ -37,47 +36,79 @@ function Debrief() {
 
   const templateId = templateIdFor(labId);
   const definition = registry.find((lab) => lab.id === templateId);
+  const usableExtra = extra.filter((row) => row.prompt.trim().length > 0);
 
   const result = useMemo(() => {
-    // Prefer scoring the JSON lab tasks the learner actually answered in TaskList.
+    const detail: {
+      id: string;
+      ok: boolean;
+      points: number;
+      prompt: string;
+      answer: string;
+    }[] = [];
+    let score = 0;
+    let total = 0;
+
     if (definition && definition.steps.length > 0) {
       const labResult = computeLabScore(definition, answers, lureVisited);
-      return {
-        mode: "lab-tasks" as const,
-        score: labResult.score,
-        total: labResult.total,
-        detail: labResult.detail.map((d) => {
-          const step = definition.steps.find((s) => s.id === d.id);
-          return {
-            id: d.id,
-            ok: d.ok,
-            points: d.points,
-            prompt: step?.prompt ?? d.title,
-            answer: answers[d.id] ?? "",
-          };
-        }),
-      };
-    }
-
-    // Fallback: campaign pack exam questions for this labId (not always catalog[0]).
-    const pack = getLab(labId);
-    const scored = computeScore(labId, extra, answers);
-    return {
-      mode: "campaign" as const,
-      score: scored.score,
-      total: scored.total || totalFor(pack.questions),
-      detail: scored.detail.map((d) => {
-        const q = pack.questions.find((x) => x.id === d.id);
-        return {
+      score += labResult.score;
+      total += labResult.total;
+      for (const d of labResult.detail) {
+        const step = definition.steps.find((s) => s.id === d.id);
+        detail.push({
           id: d.id,
           ok: d.ok,
           points: d.points,
-          prompt: q?.prompt ?? d.id,
+          prompt: step?.prompt ?? d.title,
           answer: answers[d.id] ?? "",
-        };
-      }),
+        });
+      }
+    } else {
+      const pack = getLab(labId);
+      for (const q of pack.questions) {
+        total += q.points;
+        const ok = gradeQuestion(q, answers[q.id] ?? "");
+        if (ok) score += q.points;
+        detail.push({
+          id: q.id,
+          ok,
+          points: q.points,
+          prompt: q.prompt,
+          answer: answers[q.id] ?? "",
+        });
+      }
+    }
+
+    // Always append instructor/custom questions from Admin (browser session).
+    usableExtra.forEach((row, index) => {
+      const id = `extra-${index}`;
+      const q = {
+        id,
+        points: row.points,
+        prompt: row.prompt,
+        hint: "Instructor question",
+        kind: "text" as const,
+        accept: [row.answer],
+      };
+      total += row.points;
+      const ok = gradeQuestion(q, answers[id] ?? "");
+      if (ok) score += row.points;
+      detail.push({
+        id,
+        ok,
+        points: row.points,
+        prompt: row.prompt,
+        answer: answers[id] ?? "",
+      });
+    });
+
+    return {
+      mode: definition ? ("lab-tasks" as const) : ("campaign" as const),
+      score,
+      total,
+      detail,
     };
-  }, [definition, answers, lureVisited, labId, extra]);
+  }, [definition, answers, lureVisited, labId, usableExtra]);
 
   const cutoff = Math.round(result.total * 0.64);
 
@@ -99,7 +130,7 @@ function Debrief() {
         <h1 className="text-3xl font-semibold">Qualification result</h1>
         <p className="text-sm text-muted">
           Lab: <span className="text-fg">{definition?.title ?? getLab(labId).title}</span>
-          {result.mode === "lab-tasks" ? " · scored from lab tasks" : " · scored from campaign exam"}
+          {usableExtra.length > 0 ? ` · +${usableExtra.length} instructor question(s)` : null}
         </p>
         <p className="font-mono text-5xl tabular-nums text-primary">
           {result.score}
