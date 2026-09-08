@@ -9,6 +9,8 @@ import {
   Paperclip,
   Search,
   ShieldAlert,
+  Filter,
+  Keyboard,
 } from "lucide-react";
 import { EmailViewer } from "@/components/engine/email-viewer";
 import { collectAllSamples, type Artifact } from "@/lib/labs/artifacts";
@@ -61,6 +63,14 @@ function formatBytes(n: number): string {
 export function EngineConsole({ initialSampleId }: { initialSampleId?: string }) {
   const [labs, setLabs] = useState<LabDefinition[]>(() => loadFileLabs().map((record) => record.definition));
   const samples = useMemo(() => collectAllSamples(labs), [labs]);
+  const [sampleFilter, setSampleFilter] = useState("");
+  const filteredSamples = useMemo(() => {
+    const q = sampleFilter.trim().toLowerCase();
+    if (!q) return samples;
+    return samples.filter((item) =>
+      [item.subject, item.fromAddr, item.fromName, item.labTitle, item.folder].join(" ").toLowerCase().includes(q),
+    );
+  }, [samples, sampleFilter]);
   const initialMatch = samples.find(
     (item) => item.sampleId === initialSampleId || item.sampleId.endsWith(`:${initialSampleId ?? ""}`),
   );
@@ -217,23 +227,59 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
           <aside className="h-full overflow-auto p-3">
             <div className="mb-3 flex items-center gap-2 px-2 text-sm font-medium">
               <Activity className="size-4 text-primary" /> Sample inbox
+              <span className="ml-auto text-[10px] text-muted">
+                {filteredSamples.length}/{samples.length}
+              </span>
+            </div>
+            <div className="mb-2 px-1">
+              <div className="relative">
+                <Filter className="pointer-events-none absolute top-2.5 left-2 size-3.5 text-muted" />
+                <input
+                  value={sampleFilter}
+                  onChange={(e) => setSampleFilter(e.target.value)}
+                  placeholder="Filter subject, sender, lab…"
+                  className="min-h-9 w-full rounded-md border border-border bg-raised py-1.5 pr-2 pl-8 text-xs"
+                />
+              </div>
             </div>
             <div className="space-y-1">
-              {samples.map((item) => (
-                <button
-                  key={item.sampleId}
-                  type="button"
-                  onClick={() => selectSample(item.sampleId)}
-                  className={cn(
-                    "w-full rounded-lg p-3 text-left",
-                    item.sampleId === sample.sampleId ? "bg-raised" : "hover:bg-raised/60",
-                  )}
-                >
-                  <span className="block truncate text-sm font-medium">{item.subject}</span>
-                  <span className="mt-1 block truncate text-xs text-muted">{item.fromAddr}</span>
-                  <span className="mt-1 block text-[10px] uppercase text-primary">{item.labTitle}</span>
-                </button>
-              ))}
+              {filteredSamples.length === 0 ? (
+                <p className="px-2 text-xs text-muted">No samples match this filter.</p>
+              ) : (
+                filteredSamples.map((item) => {
+                  const itemHits = evaluateRules(item, rules, iocs);
+                  const risk = itemHits.length >= 3 ? "high" : itemHits.length ? "review" : "low";
+                  return (
+                    <button
+                      key={item.sampleId}
+                      type="button"
+                      onClick={() => selectSample(item.sampleId)}
+                      className={cn(
+                        "w-full rounded-lg p-3 text-left",
+                        item.sampleId === sample.sampleId ? "bg-raised" : "hover:bg-raised/60",
+                      )}
+                    >
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="block truncate text-sm font-medium">{item.subject}</span>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase",
+                            risk === "high"
+                              ? "bg-crit/15 text-crit"
+                              : risk === "review"
+                                ? "bg-warn/15 text-warn"
+                                : "bg-pass/15 text-pass",
+                          )}
+                        >
+                          {risk}
+                        </span>
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted">{item.fromAddr}</span>
+                      <span className="mt-1 block text-[10px] uppercase text-primary">{item.labTitle}</span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </aside>
         </Panel>
@@ -347,7 +393,7 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-muted">Actions update an in-app audit trail only.</p>
+                <p className="mt-3 text-xs text-muted">Actions update an in-app audit trail only. Keys 1–4 also work.</p>
               </section>
             </div>
             <section className="grid gap-4 lg:grid-cols-2">
@@ -404,6 +450,39 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
             </section>
             <section className="rounded-xl border border-border bg-surface p-4">
               <div className="mb-3 flex items-center gap-2">
+                <Keyboard className="size-4 text-primary" />
+                <h3 className="text-sm font-medium">Analyst checklist</h3>
+                <span className="ml-auto text-[10px] text-muted">1 phishing · 2 quarantine · 3 release · 4 escalate</span>
+              </div>
+              <ul className="grid gap-2 text-xs sm:grid-cols-2">
+                {(
+                  [
+                    ["Display name vs From domain", sample.artifacts.some((a) => a.kind === "sender")],
+                    ["SPF / DKIM / DMARC reviewed", sample.artifacts.some((a) => a.kind === "auth")],
+                    ["Reply-To checked", sample.artifacts.some((a) => a.kind === "reply-to")],
+                    ["URLs inspected (host vs link text)", sample.artifacts.some((a) => a.kind === "url")],
+                    [
+                      "Attachments reviewed in Artifacts",
+                      sample.artifacts.some((a) => a.kind === "attachment") ? view === "artifacts" : true,
+                    ],
+                    ["Verdict recorded", Boolean(verdict)],
+                  ] as [string, boolean][]
+                ).map(([label, done]) => (
+                  <li
+                    key={label}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md border px-3 py-2",
+                      done ? "border-pass/30 bg-pass/5 text-fg" : "border-border text-muted",
+                    )}
+                  >
+                    <CheckCircle2 className={cn("size-3.5", done ? "text-pass" : "text-muted")} />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section className="rounded-xl border border-border bg-surface p-4">
+              <div className="mb-3 flex items-center gap-2">
                 <ShieldAlert className="size-4 text-crit" />
                 <h3 className="text-sm font-medium">Detection evidence</h3>
                 <span className="ml-auto text-xs text-muted">{rules.length} active rules</span>
@@ -435,7 +514,7 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-surface p-4">
-                <h3 className="text-sm font-medium mb-3">Case activity</h3>
+                <h3 className="mb-3 text-sm font-medium">Case activity</h3>
                 {audit.length ? (
                   <ul className="space-y-2 text-xs">
                     {audit.map((entry, index) => (
@@ -464,11 +543,7 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
                 placeholder="Add a domain, sender, or hash to the training IOC list"
                 className="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-raised px-3 text-xs"
               />
-              <button
-                type="button"
-                onClick={() => void addIndicator()}
-                className="min-h-9 rounded-md border border-border px-3 text-xs"
-              >
+              <button type="button" onClick={() => void addIndicator()} className="min-h-9 rounded-md border border-border px-3 text-xs">
                 Add IOC
               </button>
             </div>
@@ -506,12 +581,7 @@ function AttachmentCard({ artifact }: { artifact: Artifact }) {
   const validHash = /^[a-f0-9]{64}$/i.test(sha);
 
   return (
-    <article
-      className={cn(
-        "rounded-lg border p-4",
-        risky ? "border-crit/40 bg-crit/5" : "border-border bg-surface",
-      )}
-    >
+    <article className={cn("rounded-lg border p-4", risky ? "border-crit/40 bg-crit/5" : "border-border bg-surface")}>
       <div className="flex items-start gap-3">
         <div className={cn("rounded-md p-2", risky ? "bg-crit/15 text-crit" : "bg-raised text-primary")}>
           {risky ? <FileWarning className="size-5" /> : <Paperclip className="size-5" />}
@@ -566,7 +636,9 @@ function ArtifactPanel({ sample }: { sample: ReturnType<typeof collectAllSamples
         <div className="mb-3 flex items-center gap-2">
           <Paperclip className="size-4 text-primary" />
           <h3 className="text-sm font-medium">Attachments</h3>
-          <span className="ml-auto text-xs text-muted">{attachments.length} file{attachments.length === 1 ? "" : "s"}</span>
+          <span className="ml-auto text-xs text-muted">
+            {attachments.length} file{attachments.length === 1 ? "" : "s"}
+          </span>
         </div>
         {attachments.length === 0 ? (
           <p className="text-sm text-muted">No attachment metadata on this template sample.</p>
