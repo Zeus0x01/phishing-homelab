@@ -6,107 +6,75 @@
   "category": "web",
   "minutes": 18,
   "learningObjectives": [
-    "Detect digit and homoglyph substitutions in brand domains",
-    "Read punycode (xn--) as a decoding step, not as proof of safety",
-    "Flag newly popular throwaway TLDs used in templates",
-    "Trace a static redirect chain listed on the sample"
+    "Detect digit and character substitutions in brand-like domains",
+    "Treat punycode (xn--) as something to decode, not as proof of safety",
+    "Flag disposable or unusual TLDs in unsolicited messages",
+    "Compare displayed link text to the real hostname"
   ],
   "steps": [
     {
       "id": "u1",
-      "title": "Homoglyph hostname",
-      "prompt": "Which hostname in the invoice sample is a lookalike of paypal.com?",
+      "title": "Lookalike brand domain",
+      "prompt": "Which hostname is a lookalike of paypal.com (digit or character substitution)?",
+      "hint": "Compare letter by letter with paypal.com — watch for 1 vs l.",
       "checkType": "flag",
       "expected": ["paypa1-secure.com", "www.paypa1-secure.com"],
       "points": 20
     },
     {
       "id": "u2",
-      "title": "Punycode",
-      "prompt": "What is the punycode form stored for the Cyrillic lookalike URL?",
-      "hint": "Open Engine → artifacts → URLs.",
+      "title": "Punycode decoding",
+      "prompt": "What punycode (xn--) hostname is stored for the internationalized lookalike URL?",
+      "hint": "Engine → artifacts → URL entries list punycode even when the UI shows Unicode.",
       "checkType": "flag",
       "expected": ["xn--pypal-4ve.com", "www.xn--pypal-4ve.com"],
       "points": 20
     },
     {
       "id": "u3",
-      "title": "TLD",
-      "prompt": "Which TLD on the invoice lure is in the risky set {xyz, top, click}?",
+      "title": "Risky TLD",
+      "prompt": "Which TLD on the invoice lure is commonly treated as higher risk in this training set?",
+      "hint": "Compare the options to the hostname on the lure link.",
       "checkType": "choice",
       "choices": ["com", "xyz", "example"],
       "expected": ["xyz"],
       "points": 15
+    },
+    {
+      "id": "u4",
+      "title": "What to do next",
+      "prompt": "You found a lookalike domain and a risky TLD. What is the best next action in this training scenario?",
+      "checkType": "choice",
+      "choices": [
+        "Click through to verify the page looks real",
+        "Report / quarantine and do not use the link",
+        "Reply to the sender asking if it is legitimate"
+      ],
+      "expected": ["Report / quarantine and do not use the link"],
+      "points": 15
     }
   ],
   "hints": [
-    "A Latin 'l' and a digit '1' are easy to miss at small type sizes.",
-    "The Engine artifacts panel lists punycode even when the rendered link shows Unicode."
+    "A Latin 'l' and digit '1' are easy to miss at small font sizes.",
+    "Punycode is a representation of Unicode domains — decode it before trusting the brand.",
+    "Never verify a suspicious link by opening it on a production machine; use the training Engine panel instead."
   ],
   "scoringRubric": [
-    { "id": "r1", "description": "PayPal lookalike named", "points": 20 },
-    { "id": "r2", "description": "Punycode decoded", "points": 20 },
-    { "id": "r3", "description": "Risky TLD named", "points": 15 }
+    {"id": "r1", "description": "PayPal lookalike named", "points": 20},
+    {"id": "r2", "description": "Punycode identified", "points": 20},
+    {"id": "r3", "description": "Risky TLD named", "points": 15},
+    {"id": "r4", "description": "Correct response action", "points": 15}
   ],
   "flags": [
-    { "id": "lookalike-host", "label": "Lookalike host", "check": "contains", "value": "paypa1-secure.com", "points": 20 }
+    {
+      "id": "lookalike-host",
+      "label": "Lookalike host",
+      "check": "contains",
+      "value": "paypa1-secure.com",
+      "points": 20
+    }
   ],
   "renderer": "url-typospot",
   "published": true,
-  "emailSamples": [
-    {
-      "id": "invoice-lookalike-01",
-      "folder": "Finance",
-      "fromName": "PayPal Billing",
-      "fromAddr": "service@paypa1-secure.com",
-      "replyTo": "billing@paypa1-secure.com",
-      "to": "ap@northwind-lab.example",
-      "subject": "Invoice 88421 overdue — pay to avoid restriction",
-      "date": "Tue, 08 Sep 2026 11:40:00 +0000",
-      "preview": "Invoice 88421 is 3 days overdue…",
-      "html": "<p>Your PayPal Business account has a past-due invoice.</p><p><a href=\"https://www.paypa1-secure.com/cgi-bin/webscr?cmd=_pay\">View invoice</a></p><p>Alternate: <a href=\"https://www.раypal.com/invoice\">www.раypal.com/invoice</a></p><p>Help article: <a href=\"https://help.northwind-refunds.xyz/pay\">help.northwind-refunds.xyz</a></p>",
-      "rawSource": "From: service@paypa1-secure.com\nSubject: Invoice 88421 overdue — pay to avoid restriction\n\nTraining raw source for lookalike URLs.",
-      "headers": "From: \"PayPal Billing\" <service@paypa1-secure.com>\nReply-To: billing@paypa1-secure.com\nTo: ap@northwind-lab.example\nSubject: Invoice 88421 overdue — pay to avoid restriction\nAuthentication-Results: mx.northwind-lab.example; spf=fail; dkim=fail; dmarc=fail",
-      "auth": { "spf": "fail", "dkim": "fail", "dmarc": "fail" },
-      "urls": [
-        {
-          "display": "View invoice",
-          "href": "https://www.paypa1-secure.com/cgi-bin/webscr?cmd=_pay",
-          "hostname": "www.paypa1-secure.com",
-          "punycode": "www.paypa1-secure.com",
-          "tld": "com",
-          "suspiciousTld": false,
-          "redirectChain": [
-            "https://www.paypa1-secure.com/cgi-bin/webscr?cmd=_pay",
-            "https://track.campaign-relay.top/c/88421",
-            "https://secure-verify.live/paypal/login"
-          ]
-        },
-        {
-          "display": "www.раypal.com/invoice",
-          "href": "https://www.xn--pypal-4ve.com/invoice",
-          "hostname": "www.xn--pypal-4ve.com",
-          "punycode": "www.xn--pypal-4ve.com",
-          "tld": "com",
-          "suspiciousTld": false,
-          "redirectChain": ["https://www.xn--pypal-4ve.com/invoice"]
-        },
-        {
-          "display": "help.northwind-refunds.xyz",
-          "href": "https://help.northwind-refunds.xyz/pay",
-          "hostname": "help.northwind-refunds.xyz",
-          "punycode": "help.northwind-refunds.xyz",
-          "tld": "xyz",
-          "suspiciousTld": true,
-          "redirectChain": ["https://help.northwind-refunds.xyz/pay"]
-        }
-      ],
-      "attachments": [],
-      "images": [],
-      "language": { "locale": "en", "tone": ["urgent", "invoice", "fear"], "urgencyScore": 78 },
-      "sendingIps": ["198.51.100.44"],
-      "fakeLoginIndicators": ["paypal brand in path on unrelated host"],
-      "credentialHarvest": true
-    }
-  ]
+  "emailSamples": []
 }
