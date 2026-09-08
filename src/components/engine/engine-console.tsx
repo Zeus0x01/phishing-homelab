@@ -3,8 +3,6 @@ import {
   Activity,
   CheckCircle2,
   Clipboard,
-  ExternalLink,
-  FileWarning,
   GitBranch,
   Paperclip,
   Search,
@@ -13,6 +11,7 @@ import {
   Keyboard,
 } from "lucide-react";
 import { EmailViewer } from "@/components/engine/email-viewer";
+import { AttachmentCard } from "@/components/engine/attachment-card";
 import { collectAllSamples, type Artifact } from "@/lib/labs/artifacts";
 import { loadFileLabs } from "@/lib/labs/loader";
 import type { LabDefinition } from "@/lib/labs/schema";
@@ -43,22 +42,6 @@ const verdicts: { id: Verdict; label: string }[] = [
   { id: "release", label: "Release" },
   { id: "escalate", label: "Escalate" },
 ];
-
-const RISKY_EXTS = new Set([
-  "exe", "scr", "js", "jse", "vbs", "vbe", "bat", "cmd", "ps1", "msi",
-  "iso", "img", "html", "htm", "hta", "lnk", "docm", "xlsm", "pptm", "zip", "rar", "7z",
-]);
-
-function virusTotalUrl(sha256: string): string {
-  return `https://www.virustotal.com/gui/file/${encodeURIComponent(sha256)}`;
-}
-
-function formatBytes(n: number): string {
-  if (!n || n <= 0) return "size unknown (training metadata)";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function EngineConsole({ initialSampleId }: { initialSampleId?: string }) {
   const [labs, setLabs] = useState<LabDefinition[]>(() => loadFileLabs().map((record) => record.definition));
@@ -485,10 +468,10 @@ export function EngineConsole({ initialSampleId }: { initialSampleId?: string })
               <div className="mb-3 flex items-center gap-2">
                 <ShieldAlert className="size-4 text-crit" />
                 <h3 className="text-sm font-medium">Detection evidence</h3>
-                <span className="ml-auto text-xs text-muted">{rules.length} active rules</span>
+                <span className="ml-auto text-xs text-muted">{rules.length} active rules · {hits.length} hits</span>
               </div>
               {hits.length === 0 ? (
-                <p className="text-sm text-muted">No active rules matched this sample.</p>
+                <p className="text-sm text-muted">No active rules matched this sample. Switch samples or add IOCs to change hits.</p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {hits.map((hit) => (
@@ -568,60 +551,6 @@ function RuleHitCard({ hit, onInspect }: { hit: RuleHit; onInspect: () => void }
           </li>
         ))}
       </ul>
-    </article>
-  );
-}
-
-function AttachmentCard({ artifact }: { artifact: Artifact }) {
-  const ext = String(artifact.meta.ext ?? "");
-  const sha = String(artifact.meta.sha256 ?? artifact.value);
-  const sizeBytes = Number(artifact.meta.sizeBytes ?? 0);
-  const type = String(artifact.meta.type ?? "application/octet-stream");
-  const risky = RISKY_EXTS.has(ext.toLowerCase());
-  const validHash = /^[a-f0-9]{64}$/i.test(sha);
-
-  return (
-    <article className={cn("rounded-lg border p-4", risky ? "border-crit/40 bg-crit/5" : "border-border bg-surface")}>
-      <div className="flex items-start gap-3">
-        <div className={cn("rounded-md p-2", risky ? "bg-crit/15 text-crit" : "bg-raised text-primary")}>
-          {risky ? <FileWarning className="size-5" /> : <Paperclip className="size-5" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{artifact.label}</p>
-          <p className="mt-1 text-[11px] text-muted">
-            {type} · {formatBytes(sizeBytes)}
-            {ext ? ` · .${ext}` : ""}
-            {risky ? " · elevated-risk extension" : ""}
-          </p>
-          <p className="mt-2 break-all font-mono text-[10px] text-muted">SHA-256: {sha}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {validHash ? (
-              <a
-                href={virusTotalUrl(sha)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-primary hover:bg-raised"
-              >
-                <ExternalLink className="size-3.5" />
-                Open on VirusTotal
-              </a>
-            ) : (
-              <span className="text-[11px] text-muted">Hash not in SHA-256 format — VT link skipped</span>
-            )}
-            <button
-              type="button"
-              className="inline-flex min-h-9 items-center rounded-md border border-border px-3 text-xs"
-              onClick={() => void navigator.clipboard.writeText(sha)}
-            >
-              Copy hash
-            </button>
-          </div>
-          <p className="mt-2 text-[10px] text-muted">
-            Lookup is by hash only (no file upload). Fictional training hashes may show "not found" on VirusTotal — that is
-            expected.
-          </p>
-        </div>
-      </div>
     </article>
   );
 }
