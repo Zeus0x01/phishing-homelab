@@ -76,5 +76,59 @@
   ],
   "renderer": "url-typospot",
   "published": true,
-  "emailSamples": []
+  "emailSamples": [
+    {
+      "id": "invoice-lookalike-01",
+      "folder": "Finance",
+      "fromName": "PayPal Billing",
+      "fromAddr": "service@paypa1-secure.com",
+      "replyTo": "billing@paypa1-secure.com",
+      "to": "ap@northwind-lab.example",
+      "subject": "Invoice 88421 overdue — pay to avoid restriction",
+      "date": "Tue, 08 Sep 2026 11:40:00 +0000",
+      "preview": "Invoice 88421 is 3 days overdue…",
+      "html": "<p>Your PayPal Business account has a past-due invoice.</p><p><a href=\"https://www.paypa1-secure.com/invoice/88421\">View invoice</a></p><p><a href=\"https://www.xn--pypal-4ve.com/pay\">Unicode lookalike pay link</a></p><p><a href=\"https://pay-now.campaign-relay.xyz/r/pp\">Secure checkout</a></p>",
+      "rawSource": "From: service@paypa1-secure.com\nSubject: Invoice 88421 overdue\n\nTRAINING SAMPLE",
+      "headers": "From: \"PayPal Billing\" <service@paypa1-secure.com>\nReply-To: billing@paypa1-secure.com\nTo: ap@northwind-lab.example\nSubject: Invoice 88421 overdue — pay to avoid restriction\nAuthentication-Results: spf=fail; dkim=none; dmarc=fail",
+      "auth": {"spf": "fail", "dkim": "none", "dmarc": "fail"},
+      "urls": [
+        {
+          "display": "View invoice",
+          "href": "https://www.paypa1-secure.com/invoice/88421",
+          "hostname": "www.paypa1-secure.com",
+          "punycode": "www.paypa1-secure.com",
+          "tld": "com",
+          "suspiciousTld": false,
+          "redirectChain": ["https://www.paypa1-secure.com/invoice/88421"]
+        },
+        {
+          "display": "Unicode lookalike pay link",
+          "href": "https://www.xn--pypal-4ve.com/pay",
+          "hostname": "www.xn--pypal-4ve.com",
+          "punycode": "www.xn--pypal-4ve.com",
+          "tld": "com",
+          "suspiciousTld": false,
+          "redirectChain": ["https://www.xn--pypal-4ve.com/pay"]
+        },
+        {
+          "display": "Secure checkout",
+          "href": "https://pay-now.campaign-relay.xyz/r/pp",
+          "hostname": "pay-now.campaign-relay.xyz",
+          "punycode": "pay-now.campaign-relay.xyz",
+          "tld": "xyz",
+          "suspiciousTld": true,
+          "redirectChain": [
+            "https://pay-now.campaign-relay.xyz/r/pp",
+            "https://www.paypa1-secure.com/checkout"
+          ]
+        }
+      ],
+      "attachments": [],
+      "images": [],
+      "language": {"locale": "en", "tone": ["finance", "urgent"], "urgencyScore": 72},
+      "sendingIps": ["198.51.100.44"],
+      "fakeLoginIndicators": ["brand lookalike", "payment urgency"],
+      "credentialHarvest": false
+    }
+  ]
 }
