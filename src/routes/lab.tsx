@@ -176,7 +176,7 @@ function AttachPane({ sample, pack }: { sample?: ExtractedSample; pack: LabPack 
           </article>
         ))}
       {!sample && <p className="text-sm text-muted">No attachment artifacts on this template.</p>}
-      <p className="text-xs text-muted">Pack vectors: {pack.vectors?.join(", ") || "n/a"}</p>
+      <p className="text-xs text-muted">Source note: {pack.attachmentSource || "n/a"}</p>
     </main>
   );
 }
@@ -216,7 +216,7 @@ function VectorsPane({ pack, sample }: { pack: LabPack; sample?: ExtractedSample
             <li>Escalate the request as a training incident.</li>
           </ul>
         )}
-        <p className="mt-2 text-xs text-muted">Pack notes: {pack.vectors?.join(" · ") || sample?.subject || "n/a"}</p>
+        <p className="mt-2 text-xs text-muted">Lure host (training): {pack.lureHost || sample?.subject || "n/a"}</p>
       </section>
     </div>
   );
