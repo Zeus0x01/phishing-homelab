@@ -1,65 +1,122 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Activity, Award, Flame, Target } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Award, BookOpen, Shield } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
 import { catalog } from "@/data/campaign";
 import { useLab } from "@/lib/store";
 import { cn } from "@/lib/cn";
-import { AppShell } from "@/components/app-shell";
+import type { LabDefinition } from "@/lib/labs/schema";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
+type RegistryLab = { definition: LabDefinition; source: string; readonly: boolean };
+
 function Dashboard() {
+  const nav = useNavigate();
   const labId = useLab((s) => s.labId);
   const setLab = useLab((s) => s.setLab);
+  const startLab = useLab((s) => s.startLab);
+  const [registry, setRegistry] = useState<RegistryLab[]>([]);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    void fetch("/api/labs")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load lab registry");
+        return (await response.json()) as RegistryLab[];
+      })
+      .then((records) => setRegistry(records))
+      .catch((error: unknown) => setLoadError(error instanceof Error ? error.message : "Registry unavailable"));
+  }, []);
+
+  const published = useMemo(() => {
+    const fromRegistry = registry
+      .map((r) => r.definition)
+      .filter((d) => d.published !== false);
+    if (fromRegistry.length > 0) return fromRegistry;
+    // Fallback only if registry empty (offline/dev)
+    return catalog.map((l) => ({
+      id: l.id,
+      title: l.name,
+      description: l.blurb,
+      difficulty: "intro" as const,
+      category: "email" as const,
+      minutes: l.minutes,
+      learningObjectives: [] as string[],
+      steps: [] as LabDefinition["steps"],
+      published: true,
+    }));
+  }, [registry]);
+
+  function openLab(id: string) {
+    setLab(id);
+    startLab(id);
+    void nav({ to: "/lab" });
+  }
 
   return (
-    <AppShell eyebrow="Overview" title="Dashboard">
-      <main className="mx-auto flex max-w-7xl flex-col gap-8 px-page py-8">
-        <header className="flex flex-col gap-2">
-          <p className="max-w-2xl text-sm leading-relaxed text-muted">
-            Practice detection decisions against fictional artifacts, review the evidence, and build a repeatable analyst habit.
-          </p>
-        </header>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <DashboardStat icon={Award} label="Labs completed" value="0" note="Start your first run" />
-          <DashboardStat icon={Target} label="Average score" value="--" note="Awaiting scored attempts" />
-          <DashboardStat icon={Flame} label="Current streak" value="0 days" note="Keep the signal alive" />
-          <DashboardStat icon={Activity} label="Detection accuracy" value="--" note="No verdicts recorded" />
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="rounded-panel border border-border bg-surface p-5"><div className="flex items-center justify-between"><div><h2 className="font-medium">Weekly activity</h2><p className="mt-1 text-xs text-muted">Training attempts remain inside this app.</p></div><span className="font-mono text-xs text-primary">last 7 days</span></div><div className="mt-7 flex h-32 items-end gap-3 border-b border-l border-border px-4">{[28, 42, 22, 58, 36, 74, 48].map((height, index) => <div key={index} className="group flex flex-1 flex-col items-center gap-2"><div className="w-full max-w-12 rounded-t bg-primary/65 group-hover:bg-primary" style={{ height: `${height}%` }} /><span className="font-mono text-[10px] text-muted">{["M", "T", "W", "T", "F", "S", "S"][index]}</span></div>)}</div></div>
-          <div className="rounded-panel border border-border bg-surface p-5"><h2 className="font-medium">Recent activity</h2><p className="mt-1 text-xs text-muted">Completed simulations and verdicts will appear here.</p><div className="mt-6 rounded-control border border-dashed border-border p-5 text-center text-sm text-muted">No activity recorded yet.</div></div>
+    <AppShell eyebrow="Operations" title="Dashboard">
+      <main className="mx-auto max-w-6xl space-y-8 px-page py-8">
+        <section className="grid gap-3 sm:grid-cols-3">
+          <DashboardStat icon={BookOpen} label="Labs available" value={String(published.length)} note="From live registry" />
+          <DashboardStat icon={Shield} label="Active lab" value={labId || "—"} note="Session selection" />
+          <DashboardStat icon={Award} label="Mode" value="Training" note="Closed homelab" />
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-medium">Labs</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium">Labs</h2>
+            <Link to="/labs" className="text-sm text-primary underline">
+              Open catalog
+            </Link>
+          </div>
+          {loadError ? <p className="mb-3 text-sm text-muted">{loadError}</p> : null}
           <ul className="grid gap-3 sm:grid-cols-2">
-            {catalog.map((l) => (
-              <li key={l.id}>
+            {published.map((lab) => (
+              <li key={lab.id}>
                 <button
                   type="button"
-                  onClick={() => setLab(l.id)}
+                  onClick={() => openLab(lab.id)}
                   className={cn(
                     "flex min-h-24 w-full flex-col items-start gap-1 rounded-xl border p-4 text-left",
-                    labId === l.id ? "border-primary bg-surface" : "border-border bg-surface",
+                    labId === lab.id ? "border-primary bg-surface" : "border-border bg-surface",
                   )}
                 >
-                  <span className="font-mono text-[10px] text-primary">{l.code}</span>
-                  <span className="font-medium">{l.name}</span>
-                  <span className="text-sm text-muted">{l.blurb}</span>
-                  <span className="font-mono text-xs text-muted">{l.minutes} min · {l.questions.length} Q</span>
+                  <span className="font-mono text-[10px] uppercase text-primary">
+                    {lab.category} · {lab.difficulty}
+                  </span>
+                  <span className="font-medium">{lab.title}</span>
+                  <span className="line-clamp-2 text-sm text-muted">{lab.description}</span>
+                  <span className="font-mono text-xs text-muted">
+                    {lab.minutes} min · {(lab.steps ?? []).length} tasks
+                  </span>
                 </button>
               </li>
             ))}
           </ul>
         </section>
-
       </main>
     </AppShell>
   );
 }
 
-function DashboardStat({ icon: Icon, label, value, note }: { icon: typeof Award; label: string; value: string; note: string }) {
-  return <article className="rounded-panel border border-border bg-surface p-4"><Icon className="size-4 text-primary" /><p className="mt-5 text-xs text-muted">{label}</p><p className="mt-1 font-mono text-2xl text-fg">{value}</p><p className="mt-1 text-xs text-muted">{note}</p></article>;
+function DashboardStat({
+  icon: Icon,
+  label,
+  value,
+  note,
+}: {
+  icon: typeof Award;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <article className="rounded-panel border border-border bg-surface p-4">
+      <Icon className="size-4 text-primary" />
+      <p className="mt-5 text-xs text-muted">{label}</p>
+      <p className="mt-1 font-mono text-2xl text-fg">{value}</p>
+      <p className="mt-1 text-xs text-muted">{note}</p>
+    </article>
+  );
 }

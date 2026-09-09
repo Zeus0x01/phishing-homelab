@@ -4,7 +4,7 @@ export const LAB_BANNER =
   "TRAINING SIMULATION — closed homelab. No mail is sent or received. No credentials leave this app. All artifacts are fictional.";
 
 export const difficultySchema = z.enum(["intro", "intermediate", "advanced"]);
-export const categorySchema = z.enum(["email", "web", "SMS", "vishing"]);
+export const categorySchema = z.enum(["email", "web", "SMS", "vishing", "url", "smishing", "social", "qr", "attachment"]);
 export const authResultSchema = z.enum(["pass", "fail", "none"]);
 
 export const emailUrlSchema = z.object({
@@ -67,6 +67,8 @@ export const labStepSchema = z.object({
   hint: z.string().optional(),
   checkType: z.enum(["manual", "flag", "choice", "visit-lure"]),
   expected: z.array(z.string()).optional(),
+  /** Optional accepted variants (AiTM, Adversary in the Middle, …). */
+  aliases: z.array(z.string()).optional(),
   choices: z.array(z.string()).optional(),
   points: z.number().int().nonnegative(),
 });
@@ -88,36 +90,29 @@ export const labFlagSchema = z.object({
 export const labDefinitionSchema = z.object({
   id: z.string().min(1).regex(/^[a-z0-9-]+$/),
   title: z.string().min(1),
-  description: z.string().min(1),
+  description: z.string(),
   difficulty: difficultySchema,
   category: categorySchema,
-  minutes: z.number().int().positive().default(20),
-  learningObjectives: z.array(z.string()).min(1),
-  steps: z.array(labStepSchema).min(1),
-  hints: z.array(z.string()),
-  scoringRubric: z.array(scoringRubricSchema),
-  flags: z.array(labFlagSchema),
-  renderer: z.string().min(1),
-  emailSamples: z.array(emailSampleSchema),
-  published: z.boolean().default(true),
+  minutes: z.number().int().positive(),
+  learningObjectives: z.array(z.string()).default([]),
+  steps: z.array(labStepSchema).default([]),
+  hints: z.array(z.string()).default([]),
+  scoringRubric: z.array(scoringRubricSchema).default([]),
+  flags: z.array(labFlagSchema).default([]),
+  renderer: z.string().default("generic"),
+  emailSamples: z.array(emailSampleSchema).default([]),
+  published: z.boolean().default(false),
 });
 
 export type LabDefinition = z.infer<typeof labDefinitionSchema>;
-export type EmailSample = z.infer<typeof emailSampleSchema>;
 export type LabStep = z.infer<typeof labStepSchema>;
-
-export type LabSource = "file" | "database";
-
+export type EmailSample = z.infer<typeof emailSampleSchema>;
 export type LabRecord = {
   definition: LabDefinition;
-  source: LabSource;
+  source: "file" | "database";
   readonly: boolean;
 };
 
-export function parseLabDefinition(input: unknown): LabDefinition {
-  return labDefinitionSchema.parse(input);
-}
-
-export function safeParseLabDefinition(input: unknown) {
-  return labDefinitionSchema.safeParse(input);
+export function parseLabDefinition(raw: unknown): LabDefinition {
+  return labDefinitionSchema.parse(raw);
 }
