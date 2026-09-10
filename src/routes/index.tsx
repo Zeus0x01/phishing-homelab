@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Award, BookOpen, Shield } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { catalog } from "@/data/campaign";
 import { useLab } from "@/lib/store";
 import { cn } from "@/lib/cn";
 import type { LabDefinition } from "@/lib/labs/schema";
@@ -30,22 +29,7 @@ function Dashboard() {
   }, []);
 
   const published = useMemo(() => {
-    const fromRegistry = registry
-      .map((r) => r.definition)
-      .filter((d) => d.published !== false);
-    if (fromRegistry.length > 0) return fromRegistry;
-    // Fallback only if registry empty (offline/dev)
-    return catalog.map((l) => ({
-      id: l.id,
-      title: l.name,
-      description: l.blurb,
-      difficulty: "intro" as const,
-      category: "email" as const,
-      minutes: l.minutes,
-      learningObjectives: [] as string[],
-      steps: [] as LabDefinition["steps"],
-      published: true,
-    }));
+    return registry.map((r) => r.definition).filter((d) => d.published !== false);
   }, [registry]);
 
   function openLab(id: string) {
@@ -55,7 +39,7 @@ function Dashboard() {
   }
 
   return (
-    <AppShell eyebrow="Operations" title="Dashboard">
+    <AppShell eyebrow="Overview" title="Dashboard">
       <main className="mx-auto max-w-6xl space-y-8 px-page py-8">
         <section className="grid gap-3 sm:grid-cols-3">
           <DashboardStat icon={BookOpen} label="Labs available" value={String(published.length)} note="From live registry" />
@@ -71,6 +55,11 @@ function Dashboard() {
             </Link>
           </div>
           {loadError ? <p className="mb-3 text-sm text-muted">{loadError}</p> : null}
+          {published.length === 0 && !loadError ? (
+            <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
+              No labs in the registry yet. Publish a lab from Admin, or open the catalog.
+            </p>
+          ) : null}
           <ul className="grid gap-3 sm:grid-cols-2">
             {published.map((lab) => (
               <li key={lab.id}>
